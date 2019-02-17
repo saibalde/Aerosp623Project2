@@ -7,11 +7,15 @@
 class Mesh2d
 {
 public:
-    Mesh2d(const std::string &gridFile);
+    Mesh2d(const std::string &inFile);
 
     ~Mesh2d() = default;
 
-    void output(const std::string &gridFile) const;
+    void setupMatrices();
+
+    void output(const std::string &outFile) const;
+
+    void outputMatrices(const std::string &matFile) const;
 
     int nNode;
     int nElemTot;
@@ -29,6 +33,14 @@ public:
     int order;
     std::string basis;
     std::vector<int> E2N;
+
+    std::vector<int> I2E;
+    std::vector<int> B2E;
+
+    std::vector<double> In;
+    std::vector<double> Bn;
+
+    std::vector<double> area;
 };
 
 #endif // MESH2D_HPP
