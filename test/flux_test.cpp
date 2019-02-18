@@ -12,7 +12,7 @@ double uniform(double a, double b)
     return a + ((b - a) * std::rand() / RAND_MAX);
 }
 
-void checkConsistency()
+void consistencyTest()
 {
     const double rho = uniform( 0.0, 1.0);
     const double u   = uniform(-1.0, 1.0);
@@ -49,7 +49,7 @@ void checkConsistency()
     std::cout << "Consistency test: L2 error = " << error << std::endl;
 }
 
-void checkAntiSymmetry()
+void flipTest()
 {
     const double rhoL = uniform( 0.0, 1.0);
     const double uL   = uniform(-1.0, 1.0);
@@ -88,7 +88,7 @@ void checkAntiSymmetry()
     std::cout << "Anti-symmetry test: L2 error = " << error << std::endl;
 }
 
-void checkSupersonic()
+void supersonicTest()
 {
     const double rhoL = uniform( 0.0, 1.0);
     const double uL   = 0.8;
@@ -135,9 +135,9 @@ int main()
 {
     std::srand(0);
 
-    checkConsistency();
-    checkAntiSymmetry();
-    checkSupersonic();
+    consistencyTest();
+    flipTest();
+    supersonicTest();
 
     return 0;
 }
