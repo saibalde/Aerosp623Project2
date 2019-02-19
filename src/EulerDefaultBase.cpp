@@ -1,5 +1,7 @@
 #include "Conv2D/EulerDefaultBase.hpp"
 
+#include <iostream>
+#include <iomanip>
 #include <string>
 #include <stdexcept>
 
@@ -377,31 +379,91 @@ double EulerDefaultBase::computeResidual(const arma::mat &U, arma::mat &R,
     return arma::abs(R).max();
 }
 
-double EulerDefaultBase::timestep()
+void EulerDefaultBase::firstOrderSolver(arma::uword numIter)
 {
     arma::uword numElem = mesh_.nElemTot;
 
     arma::mat R(4, numElem);
     arma::vec S(numElem);
+
+    // compute initial residual and output
     double residual = computeResidual(U_, R, S);
+    std::cout << 0 << " "
+              << std::scientific << std::setprecision(15) << residual
+              << std::endl;
 
-    arma::vec dtOverA = 2.0 * CFL_ / S;
-
-    arma::mat Utemp(4, numElem);
-    for (arma::uword i = 0; i < numElem; ++i)
+    for (arma::uword i = 0; i < numIter; ++i)
     {
-        Utemp.col(i) = U_.col(i) - dtOverA(i) * R.col(i);
-    }
+        // esitmate timesteps
+        arma::vec dtOverA = 2.0 * CFL_ / S;
 
-    computeResidual(Utemp, R, S);
-    for (arma::uword i = 0; i < numElem; ++i)
+        // RK2 step 1
+        arma::mat Utemp(4, numElem);
+        for (arma::uword i = 0; i < numElem; ++i)
+        {
+            Utemp.col(i) = U_.col(i) - dtOverA(i) * R.col(i);
+        }
+
+        // RK2 step 2
+        computeResidual(Utemp, R, S);
+        for (arma::uword i = 0; i < numElem; ++i)
+        {
+            U_.col(i) = 0.5 * (U_.col(i) + Utemp.col(i) - dtOverA(i) * R.col(i));
+        }
+
+        // prepare residuals for next timestep
+        residual = computeResidual(U_, R, S);
+
+        // output residual
+        std::cout << i + 1 << " "
+                  << std::scientific << std::setprecision(15) << residual
+                  << std::endl;
+    }
+}
+
+void EulerDefaultBase::firstOrderSolver(double tolerance)
+{
+    arma::uword numElem = mesh_.nElemTot;
+
+    arma::mat R(4, numElem);
+    arma::vec S(numElem);
+
+    // compute initial residual and output
+    arma::uword numIter = 0;
+    double residual = computeResidual(U_, R, S);
+    std::cout << numIter << " "
+              << std::scientific << std::setprecision(15) << residual
+              << std::endl;
+
+    while (residual > tolerance)
     {
-        U_.col(i) = 0.5 * (U_.col(i) + Utemp.col(i) - dtOverA(i) * R.col(i));
+        // esitmate timesteps
+        arma::vec dtOverA = 2.0 * CFL_ / S;
+
+        // RK2 step 1
+        arma::mat Utemp(4, numElem);
+        for (arma::uword i = 0; i < numElem; ++i)
+        {
+            Utemp.col(i) = U_.col(i) - dtOverA(i) * R.col(i);
+        }
+
+        // RK2 step 2
+        computeResidual(Utemp, R, S);
+        for (arma::uword i = 0; i < numElem; ++i)
+        {
+            U_.col(i) = 0.5 * (U_.col(i) + Utemp.col(i) - dtOverA(i) * R.col(i));
+        }
+
+        // prepare residual for next timestep
+        residual = computeResidual(U_, R, S);
+
+        ++numIter;
+
+        // output residuals
+        std::cout << numIter << " "
+                  << std::scientific << std::setprecision(15) << residual
+                  << std::endl;
     }
-
-    ++stepNum_;
-
-    return residual;
 }
 
 void EulerDefaultBase::output() const

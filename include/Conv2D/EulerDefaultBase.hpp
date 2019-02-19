@@ -45,7 +45,9 @@ public:
     virtual void computeLeftFlux(const arma::vec &UInt, const arma::rowvec &n,
                                  arma::vec &F, double &s) const = 0;
 
-    double timestep();
+    void firstOrderSolver(arma::uword numIter);
+
+    void firstOrderSolver(double tolerance);
 
     void output() const;
 

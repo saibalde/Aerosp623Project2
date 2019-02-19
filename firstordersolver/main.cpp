@@ -1,7 +1,3 @@
-#include <iostream>
-#include <iomanip>
-#include <stdexcept>
-
 #include <armadillo>
 
 #include "Conv2D/Mesh.hpp"
@@ -59,28 +55,19 @@ int main()
     mesh.readFromFile("bump0.gri");
     mesh.computeMatrices();
 
+    const double gamma = 1.4;
+    const double R = 1.0;
+    const double MInf = 0.5;
+    const double pInf = 1.0;
+    const double CFL = 0.5;
+
     Euler problem;
     problem.setMesh(mesh);
-    problem.setParams(1.4, 1.0, 0.5, 1.0, 0.5);
+    problem.setParams(gamma, R, MInf, pInf, CFL);
     problem.initialize();
-    problem.output();
 
-    std::cout << "Residuals:" << std::endl;
-
-    double residual = 2.0e-7;
-    arma::uword iterCount = 0;
-
-    while (residual >= 1.0e-7)
-    {
-        residual = problem.timestep();
-
-        std::cout << iterCount << " "
-                  << std::scientific << std::setprecision(15) << residual
-                  << std::endl;
-
-        ++iterCount;
-
-    }
+    const double tolerance = 1.0e-07;
+    problem.firstOrderSolver(tolerance);
 
     return 0;
 }
