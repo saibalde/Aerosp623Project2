@@ -1,3 +1,5 @@
+#include <stdexcept>
+
 #include <armadillo>
 
 #include "Conv2D/Mesh.hpp"
@@ -49,10 +51,15 @@ void Euler::computeRightFlux(const arma::vec &UInt, const arma::rowvec &n,
     applyOutflowBC(UInt, n, F, s);
 }
 
-int main()
+int main(int argc, char **argv)
 {
+    if (argc != 2)
+    {
+        throw std::runtime_error("Name of mesh file not supplied");
+    }
+
     Mesh mesh;
-    mesh.readFromFile("bump0.gri");
+    mesh.readFromFile(argv[1]);
     mesh.computeMatrices();
 
     const double gamma = 1.4;
