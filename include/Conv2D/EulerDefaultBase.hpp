@@ -83,8 +83,8 @@ private:
 
     void computeFreeStreamState();
 
-    double computeResidual(const arma::mat &U, arma::mat &R,
-                           arma::vec &S) const;
+    double computeFirstOrderResidual(const arma::mat &U, arma::mat &R,
+                                     arma::vec &S) const;
 };
 
 #endif // EULERDEFAULTBASE_HPP

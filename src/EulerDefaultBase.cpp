@@ -249,8 +249,9 @@ void EulerDefaultBase::applyOutflowBC(const arma::vec &UInt,
     s = cb + std::abs(ub * n(0) + vb * n(1));
 }
 
-double EulerDefaultBase::computeResidual(const arma::mat &U, arma::mat &R,
-                                         arma::vec &S) const
+double EulerDefaultBase::computeFirstOrderResidual(const arma::mat &U,
+                                                   arma::mat &R,
+                                                   arma::vec &S) const
 {
     R.zeros();
     S.zeros();
@@ -387,7 +388,7 @@ void EulerDefaultBase::firstOrderSolver(arma::uword numIter)
     arma::vec S(numElem);
 
     // compute initial residual and output
-    double residual = computeResidual(U_, R, S);
+    double residual = computeFirstOrderResidual(U_, R, S);
     std::cout << 0 << " "
               << std::scientific << std::setprecision(15) << residual
               << std::endl;
@@ -405,14 +406,14 @@ void EulerDefaultBase::firstOrderSolver(arma::uword numIter)
         }
 
         // RK2 step 2
-        computeResidual(Utemp, R, S);
+        computeFirstOrderResidual(Utemp, R, S);
         for (arma::uword i = 0; i < numElem; ++i)
         {
             U_.col(i) = 0.5 * (U_.col(i) + Utemp.col(i) - dtOverA(i) * R.col(i));
         }
 
         // prepare residuals for next timestep
-        residual = computeResidual(U_, R, S);
+        residual = computeFirstOrderResidual(U_, R, S);
 
         // output residual
         std::cout << i + 1 << " "
@@ -430,7 +431,7 @@ void EulerDefaultBase::firstOrderSolver(double tolerance)
 
     // compute initial residual and output
     arma::uword numIter = 0;
-    double residual = computeResidual(U_, R, S);
+    double residual = computeFirstOrderResidual(U_, R, S);
     std::cout << numIter << " "
               << std::scientific << std::setprecision(15) << residual
               << std::endl;
@@ -448,14 +449,14 @@ void EulerDefaultBase::firstOrderSolver(double tolerance)
         }
 
         // RK2 step 2
-        computeResidual(Utemp, R, S);
+        computeFirstOrderResidual(Utemp, R, S);
         for (arma::uword i = 0; i < numElem; ++i)
         {
             U_.col(i) = 0.5 * (U_.col(i) + Utemp.col(i) - dtOverA(i) * R.col(i));
         }
 
         // prepare residual for next timestep
-        residual = computeResidual(U_, R, S);
+        residual = computeFirstOrderResidual(U_, R, S);
 
         ++numIter;
 
