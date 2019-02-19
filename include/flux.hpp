@@ -1,9 +1,9 @@
 #ifndef FLUX_HPP
 #define FLUX_HPP
 
-#include <vector>
+#include <armadillo>
 
-void roeFlux(const std::vector<double> &uL, const std::vector<double> &uR,
-             const std::vector<double> &n,  std::vector<double> &F);
+void roeFlux(const arma::vec &uL, const arma::vec &uR,
+             const arma::vec &n,  arma::vec &F);
 
 #endif // FLUX_HPP
