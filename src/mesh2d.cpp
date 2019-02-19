@@ -5,8 +5,6 @@
 #include <stdexcept>
 #include <cmath>
 
-#include <armadillo>
-
 void computeUnitDirection(double  ax, double  ay, double  bx, double  by,
                           double  cx, double  cy, double &nx, double &ny)
 {
@@ -50,37 +48,37 @@ Mesh2d::Mesh2d(const std::string &inFile)
         throw std::logic_error("We only support meshes embedded in two dimensions");
     }
 
-    nodeCoordinates.resize(2 * nNode);
-    for (int iNode = 0; iNode < nNode; ++iNode)
+    nodeCoordinates.set_size(nNode, 2);
+    for (arma::uword iNode = 0; iNode < nNode; ++iNode)
     {
-        file >> nodeCoordinates[2 * iNode] >> nodeCoordinates[2 * iNode + 1];
+        file >> nodeCoordinates(iNode, 0) >> nodeCoordinates(iNode, 1);
     }
 
     file >> nBGroup;
 
-    nBFace.resize(nBGroup);
-    nf.resize(nBGroup);
-    title.resize(nBGroup);
-    B2N.resize(nBGroup);
+    nBFace.set_size(nBGroup);
+    nf.set_size(nBGroup);
+    title.set_size(nBGroup);
+    B2N.set_size(nBGroup);
 
-    for (int iBGroup = 0; iBGroup < nBGroup; ++iBGroup)
+    for (arma::uword iBGroup = 0; iBGroup < nBGroup; ++iBGroup)
     {
-        file >> nBFace[iBGroup] >> nf[iBGroup] >> title[iBGroup];
+        file >> nBFace(iBGroup) >> nf(iBGroup) >> title(iBGroup);
 
-        if (nf[iBGroup] != 2)
+        if (nf(iBGroup) != 2)
         {
             throw std::logic_error("We only support boundary faces with two nodes");
         }
 
-        B2N[iBGroup].resize(2 * nBFace[iBGroup]);
+        B2N(iBGroup).set_size(nBFace(iBGroup), 2);
 
-        for (int iBFace = 0; iBFace < nBFace[iBGroup]; ++iBFace)
+        for (arma::uword iBFace = 0; iBFace < nBFace(iBGroup); ++iBFace)
         {
-            file >> B2N[iBGroup][2 * iBFace] >> B2N[iBGroup][2 * iBFace + 1];
+            file >> B2N(iBGroup)(iBFace, 0) >> B2N(iBGroup)(iBFace, 1);
         }
     }
 
-    int nElem;
+    arma::uword nElem;
 
     file >> nElem >> order >> basis;
 
@@ -99,94 +97,100 @@ Mesh2d::Mesh2d(const std::string &inFile)
         throw std::logic_error("We only support first order elements");
     }
 
-    E2N.resize(3 * nElemTot);
+    E2N.set_size(nElemTot, 3);
 
-    for (int iElem = 0; iElem < nElemTot; ++iElem)
+    for (arma::uword iElem = 0; iElem < nElemTot; ++iElem)
     {
-        file >> E2N[3 * iElem] >> E2N[3 * iElem + 1] >> E2N[3 * iElem + 2];
+        file >> E2N(iElem, 0) >> E2N(iElem, 1) >> E2N(iElem, 2);
     }
 }
 
 void Mesh2d::setupMatrices()
 {
     // total number of boundary faces
-    int nBFaceTot = 0;
-    for (int iBGroup = 0; iBGroup < nBGroup; ++iBGroup)
+    arma::uword nBFaceTot = 0;
+    for (arma::uword iBGroup = 0; iBGroup < nBGroup; ++iBGroup)
     {
-        nBFaceTot += nBFace[iBGroup];
+        nBFaceTot += nBFace(iBGroup);
     }
 
-    // number of interior faces (overestimated)
-    int nIFaceTot = static_cast<int>(std::ceil(1.5 * nElemTot));
+    // number of arma::uworderior faces (overestimated)
+    arma::uword nIFaceTot = static_cast<arma::uword>(std::ceil(1.5 * nElemTot));
 
     // allocate memory for mesh matrices
-    I2E.resize(4 * nIFaceTot);
-    B2E.resize(3 * nBFaceTot);
-    In.resize(2 * nIFaceTot);
-    Bn.resize(2 * nBFaceTot);
-    area.resize(nElemTot);
+    I2E.set_size (nIFaceTot, 4);
+    In.set_size  (nIFaceTot, 2);
+    Il.set_size  (nIFaceTot);
+    B2E.set_size (nBFaceTot, 3);
+    Bn.set_size  (nBFaceTot, 2);
+    Bl.set_size  (nBFaceTot);
+    area.set_size(nElemTot);
 
     // hash matrices
-    arma::SpMat<int> hashElem(nNode, nNode);
-    arma::SpMat<int> hashFace(nNode, nNode);
+    arma::SpMat<arma::uword> hashElem(nNode, nNode);
+    arma::SpMat<arma::uword> hashFace(nNode, nNode);
 
     // Update I2E and In
-    int nIFace = 0;
+    arma::uword nIFace = 0;
 
-    for (int iElem = 0; iElem < nElemTot; ++iElem)
+    for (arma::uword iElem = 0; iElem < nElemTot; ++iElem)
     {
-        std::vector<int> nodeNums(3);
-        nodeNums[0] = E2N[3 * iElem];
-        nodeNums[1] = E2N[3 * iElem + 1];
-        nodeNums[2] = E2N[3 * iElem + 2];
+        arma::Col<arma::uword>::fixed<3> nodeNums;
+        nodeNums[0] = E2N(iElem, 0);
+        nodeNums[1] = E2N(iElem, 1);
+        nodeNums[2] = E2N(iElem, 2);
 
-        for (int edge = 0; edge < 3; ++edge)
+        for (arma::uword edge = 0; edge < 3; ++edge)
         {
-            int nodeLocNum1 = edge % 3;
-            int nodeLocNum2 = (edge + 1) % 3;
-            int nodeLocNum3 = 3 - nodeLocNum1 - nodeLocNum2;
+            arma::uword nodeLocNum1 = edge % 3;
+            arma::uword nodeLocNum2 = (edge + 1) % 3;
+            arma::uword nodeLocNum3 = 3 - nodeLocNum1 - nodeLocNum2;
 
-            int nodeNum1 = nodeNums[nodeLocNum1] - 1;
-            int nodeNum2 = nodeNums[nodeLocNum2] - 1;
-            int nodeNum3 = nodeNums[nodeLocNum3] - 1;
+            arma::uword nodeNum1 = nodeNums(nodeLocNum1) - 1;
+            arma::uword nodeNum2 = nodeNums(nodeLocNum2) - 1;
+            arma::uword nodeNum3 = nodeNums(nodeLocNum3) - 1;
 
-            int nodeMin = std::min(nodeNum1, nodeNum2);
-            int nodeMax = std::max(nodeNum1, nodeNum2);
+            arma::uword nodeMin = std::min(nodeNum1, nodeNum2);
+            arma::uword nodeMax = std::max(nodeNum1, nodeNum2);
 
-            if (hashElem(nodeMin, nodeMax) == 0)
+            const arma::uword oldElem = hashElem(nodeMin, nodeMax);
+
+            if (oldElem == 0)
             {
                 // access for the first time
                 hashElem(nodeMin, nodeMax) = iElem + 1;
                 hashFace(nodeMin, nodeMax) = nodeLocNum3 + 1;
             }
-            else if (hashElem(nodeMin, nodeMax) > 0)
+            else if (0 < oldElem || oldElem < nElemTot + 1)
             {
                 // access second time: definitly interior edge
-                int oldElem = hashElem(nodeMin, nodeMax);
+                arma::uword elemL = oldElem;
+                arma::uword faceL = hashFace(nodeMin, nodeMax);
+                arma::uword elemR = iElem + 1;
+                arma::uword faceR = nodeLocNum3 + 1;
 
-                int elemL = oldElem;
-                int faceL = hashFace(nodeMin, nodeMax);
-                int elemR = iElem + 1;
-                int faceR = nodeLocNum3 + 1;
+                I2E(nIFace, 0) = elemL;
+                I2E(nIFace, 1) = faceL;
+                I2E(nIFace, 2) = elemR;
+                I2E(nIFace, 3) = faceR;
 
-                I2E[4 * nIFace]     = elemL;
-                I2E[4 * nIFace + 1] = faceL;
-                I2E[4 * nIFace + 2] = elemR;
-                I2E[4 * nIFace + 3] = faceR;
+                const double ax = nodeCoordinates(nodeNum1, 0);
+                const double ay = nodeCoordinates(nodeNum1, 1);
+                const double bx = nodeCoordinates(nodeNum2, 0);
+                const double by = nodeCoordinates(nodeNum2, 1);
+                const double cx = nodeCoordinates(nodeNum3, 0);
+                const double cy = nodeCoordinates(nodeNum3, 1);
+
+                const double l = std::hypot(ax - bx, ay - by);
+                Il(nIFace) = l;
 
                 double nx, ny;
-                computeUnitDirection(nodeCoordinates[2 * nodeNum1],
-                                     nodeCoordinates[2 * nodeNum1 + 1],
-                                     nodeCoordinates[2 * nodeNum2],
-                                     nodeCoordinates[2 * nodeNum2 + 1],
-                                     nodeCoordinates[2 * nodeNum3],
-                                     nodeCoordinates[2 * nodeNum3 + 1],
-                                     nx, ny);
+                computeUnitDirection(ax, ay, bx, by, cx, cy, nx, ny);
 
-                In[2 * nIFace]     = nx;
-                In[2 * nIFace + 1] = ny;
+                In(nIFace, 0) = nx;
+                In(nIFace, 1) = ny;
 
-                hashElem(nodeMin, nodeMax) = -1;
+                hashElem(nodeMin, nodeMax) = nElemTot + 1;
 
                 nIFace += 1;
             }
@@ -197,63 +201,67 @@ void Mesh2d::setupMatrices()
         }
     }
 
-    I2E.resize(4 * nIFace);
-    In.resize(2 * nIFace);
+    I2E.resize(nIFace, 4);
+    In.resize (nIFace, 2);
+    Il.resize (nIFace);
 
     // update B2E and Bn
-    int nBEdge = 0;
+    arma::uword nBEdge = 0;
 
-    for (int iBGroup = 0; iBGroup < nBGroup; ++iBGroup)
+    for (arma::uword iBGroup = 0; iBGroup < nBGroup; ++iBGroup)
     {
-        for (int iBFace = 0; iBFace < nBFace[iBGroup]; ++iBFace)
+        for (arma::uword iBFace = 0; iBFace < nBFace(iBGroup); ++iBFace)
         {
-            int nodeNum1 = B2N[iBGroup][2 * iBFace]     - 1;
-            int nodeNum2 = B2N[iBGroup][2 * iBFace + 1] - 1;
+            arma::uword nodeNum1 = B2N(iBGroup)(iBFace, 0) - 1;
+            arma::uword nodeNum2 = B2N(iBGroup)(iBFace, 1) - 1;
 
+            arma::uword nodeMin = std::min(nodeNum1, nodeNum2);
+            arma::uword nodeMax = std::max(nodeNum1, nodeNum2);
 
-            int nodeMin = std::min(nodeNum1, nodeNum2);
-            int nodeMax = std::max(nodeNum1, nodeNum2);
+            arma::uword elem = hashElem(nodeMin, nodeMax);
+            arma::uword face = hashFace(nodeMin, nodeMax);
 
-            int elem = hashElem(nodeMin, nodeMax);
-            int face = hashFace(nodeMin, nodeMax);
+            B2E(nBEdge, 0) = elem;
+            B2E(nBEdge, 1) = face;
+            B2E(nBEdge, 2) = iBGroup + 1;
 
-            B2E[3 * nBEdge]     = elem;
-            B2E[3 * nBEdge + 1] = face;
-            B2E[3 * nBEdge + 2] = iBGroup + 1;
+            arma::uword nodeNum3 = E2N(elem - 1, face - 1) - 1;
 
-            int nodeNum3 = E2N[3 * (elem - 1) + (face - 1)] - 1;
+            const double ax = nodeCoordinates(nodeNum1, 0);
+            const double ay = nodeCoordinates(nodeNum1, 1);
+            const double bx = nodeCoordinates(nodeNum2, 0);
+            const double by = nodeCoordinates(nodeNum2, 1);
+            const double cx = nodeCoordinates(nodeNum3, 0);
+            const double cy = nodeCoordinates(nodeNum3, 1);
+
+            const double l = std::hypot(ax - bx, ay - by);
+            Bl(nBEdge) = l;
 
             double nx, ny;
-            computeUnitDirection(nodeCoordinates[2 * nodeNum1],
-                                 nodeCoordinates[2 * nodeNum1 + 1],
-                                 nodeCoordinates[2 * nodeNum2],
-                                 nodeCoordinates[2 * nodeNum2 + 1],
-                                 nodeCoordinates[2 * nodeNum3],
-                                 nodeCoordinates[2 * nodeNum3 + 1],
-                                 nx, ny);
+            computeUnitDirection(ax, ay, bx, by, cx, cy, nx, ny);
 
-            Bn[2 * nBEdge]     = -nx;
-            Bn[2 * nBEdge + 1] = -ny;
+            Bn(nBEdge, 0) = -nx;
+            Bn(nBEdge, 1) = -ny;
 
             nBEdge += 1;
         }
     }
 
     // update area
-    for (int iElem = 0; iElem < nElemTot; ++iElem)
+    for (arma::uword iElem = 0; iElem < nElemTot; ++iElem)
     {
-        int nodeNum1 = E2N[3 * iElem]     - 1;
-        int nodeNum2 = E2N[3 * iElem + 1] - 1;
-        int nodeNum3 = E2N[3 * iElem + 2] - 1;
+        arma::uword nodeNum1 = E2N(iElem, 0) - 1;
+        arma::uword nodeNum2 = E2N(iElem, 1) - 1;
+        arma::uword nodeNum3 = E2N(iElem, 2) - 1;
 
-        double ax = nodeCoordinates[2 * nodeNum1];
-        double ay = nodeCoordinates[2 * nodeNum1 + 1];
-        double bx = nodeCoordinates[2 * nodeNum2];
-        double by = nodeCoordinates[2 * nodeNum2 + 1];
-        double cx = nodeCoordinates[2 * nodeNum3];
-        double cy = nodeCoordinates[2 * nodeNum3 + 1];
+        double ax = nodeCoordinates(nodeNum1, 0);
+        double ay = nodeCoordinates(nodeNum1, 1);
+        double bx = nodeCoordinates(nodeNum2, 0);
+        double by = nodeCoordinates(nodeNum2, 1);
+        double cx = nodeCoordinates(nodeNum3, 0);
+        double cy = nodeCoordinates(nodeNum3, 1);
 
-        area[iElem] = 0.5 * std::abs(ax * (by - cy) + bx * (cy - ay) +
+        area(iElem) = 0.5 * std::abs(ax * (by - cy) + bx * (cy - ay) +
                                      cx * (ay - by));
     }
 }
@@ -264,36 +272,36 @@ void Mesh2d::output(const std::string &outFile) const
 
     file << nNode << " " << nElemTot << " " << dim << std::endl;
 
-    for (int iNode = 0; iNode < nNode; ++iNode)
+    for (arma::uword iNode = 0; iNode < nNode; ++iNode)
     {
         file << std::scientific << std::setprecision(15)
-             << nodeCoordinates[2 * iNode] << " "
+             << nodeCoordinates(iNode, 0) << " "
              << std::scientific << std::setprecision(15)
-             << nodeCoordinates[2 * iNode + 1]
+             << nodeCoordinates(iNode, 1)
              << std::endl;
     }
 
     file << nBGroup << std::endl;
 
-    for (int iBGroup = 0; iBGroup < nBGroup; ++iBGroup)
+    for (arma::uword iBGroup = 0; iBGroup < nBGroup; ++iBGroup)
     {
-        file << nBFace[iBGroup] << " " << nf[iBGroup] << " " << title[iBGroup]
+        file << nBFace(iBGroup) << " " << nf(iBGroup) << " " << title(iBGroup)
              << std::endl;
 
-        for (int iBFace = 0; iBFace < nBFace[iBGroup]; ++iBFace)
+        for (arma::uword iBFace = 0; iBFace < nBFace(iBGroup); ++iBFace)
         {
-            file << B2N[iBGroup][2 * iBFace]     << " "
-                 << B2N[iBGroup][2 * iBFace + 1] << std::endl;
+            file << B2N(iBGroup)(iBFace, 0) << " "
+                 << B2N(iBGroup)(iBFace, 1) << std::endl;
         }
     }
 
     file << nElemTot << " " << order << " " << basis << std::endl;
 
-    for (int iElem = 0; iElem < nElemTot; ++iElem)
+    for (arma::uword iElem = 0; iElem < nElemTot; ++iElem)
     {
-        file << E2N[3 * iElem]     << " "
-             << E2N[3 * iElem + 1] << " "
-             << E2N[3 * iElem + 2] << std::endl;
+        file << E2N(iElem, 0) << " "
+             << E2N(iElem, 1) << " "
+             << E2N(iElem, 2) << std::endl;
     }
 }
 
@@ -301,53 +309,69 @@ void Mesh2d::outputMatrices(const std::string &matFile) const
 {
     std::ofstream file(matFile);
 
-    int nIFace = In.size() / 2;
-    int nBFace = Bn.size() / 2;
+    arma::uword nIFace = In.n_rows;
+    arma::uword nBFace = Bn.n_rows;
 
     file << "I2E" << std::endl << "===" << std::endl;
 
-    for (int iIFace = 0; iIFace < nIFace; ++iIFace)
+    for (arma::uword iIFace = 0; iIFace < nIFace; ++iIFace)
     {
-        file << I2E[4 * iIFace]     << " "
-             << I2E[4 * iIFace + 1] << " "
-             << I2E[4 * iIFace + 2] << " "
-             << I2E[4 * iIFace + 3] << std::endl;
+        file << I2E(iIFace, 0) << " "
+             << I2E(iIFace, 1) << " "
+             << I2E(iIFace, 2) << " "
+             << I2E(iIFace, 3) << std::endl;
     }
 
     file << std::endl << "B2E" << std::endl << "===" << std::endl;
 
-    for (int iBFace = 0; iBFace < nBFace; ++iBFace)
+    for (arma::uword iBFace = 0; iBFace < nBFace; ++iBFace)
     {
-        file << B2E[3 * iBFace]     << " "
-             << B2E[3 * iBFace + 1] << " "
-             << B2E[3 * iBFace + 2] << std::endl;
+        file << B2E(iBFace, 0) << " "
+             << B2E(iBFace, 1) << " "
+             << B2E(iBFace, 2) << std::endl;
     }
 
     file << std::endl << "In" << std::endl << "==" << std::endl;
 
-    for (int iIFace = 0; iIFace < nIFace; ++iIFace)
+    for (arma::uword iIFace = 0; iIFace < nIFace; ++iIFace)
     {
         file << std::scientific << std::setprecision(15)
-             << In[2 * iIFace]
+             << In(iIFace, 0) << " "
              << std::scientific << std::setprecision(15)
-             << " " << In[2 * iIFace + 1] << std::endl;
+             << In(iIFace, 1) << std::endl;
     }
 
     file << std::endl << "Bn" << std::endl << "==" << std::endl;
 
-    for (int iBFace = 0; iBFace < nBFace; ++iBFace)
+    for (arma::uword iBFace = 0; iBFace < nBFace; ++iBFace)
     {
         file << std::scientific << std::setprecision(15)
-             << Bn[2 * iBFace] << " "
+             << Bn(iBFace, 0) << " "
              << std::scientific << std::setprecision(15)
-             << Bn[2 * iBFace + 1] << std::endl;
+             << Bn(iBFace, 1) << std::endl;
+    }
+
+    file << std::endl << "Il" << std::endl << "==" << std::endl;
+
+    for (arma::uword iIFace = 0; iIFace < nIFace; ++iIFace)
+    {
+        file << std::scientific << std::setprecision(15)
+             << Il(iIFace) << std::endl;
+    }
+
+    file << std::endl << "Bl" << std::endl << "==" << std::endl;
+
+    for (arma::uword iBFace = 0; iBFace < nBFace; ++iBFace)
+    {
+        file << std::scientific << std::setprecision(15)
+             << Bl(iBFace) << std::endl;
     }
 
     file << std::endl << "area" << std::endl << "====" << std::endl;
 
-    for (int iElem = 0; iElem < nElemTot; ++iElem)
+    for (arma::uword iElem = 0; iElem < nElemTot; ++iElem)
     {
         file << std::scientific << std::setprecision(15)
-             << area[iElem] << std::endl;
+             << area(iElem) << std::endl;
     }
 }

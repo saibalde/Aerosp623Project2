@@ -2,7 +2,8 @@
 #define MESH2D_HPP
 
 #include <string>
-#include <vector>
+
+#include <armadillo>
 
 class Mesh2d
 {
@@ -17,30 +18,33 @@ public:
 
     void outputMatrices(const std::string &matFile) const;
 
-    int nNode;
-    int nElemTot;
-    int dim;
+    arma::uword nNode;
+    arma::uword nElemTot;
+    arma::uword dim;
 
-    std::vector<double> nodeCoordinates;
+    arma::mat nodeCoordinates;
 
-    int nBGroup;
+    arma::uword nBGroup;
 
-    std::vector<int> nBFace;
-    std::vector<int> nf;
-    std::vector<std::string> title;
-    std::vector<std::vector<int> > B2N;
+    arma::uvec nBFace;
+    arma::uvec nf;
+    arma::field<std::string> title;
+    arma::field<arma::umat> B2N;
 
-    int order;
+    arma::uword order;
     std::string basis;
-    std::vector<int> E2N;
+    arma::umat E2N;
 
-    std::vector<int> I2E;
-    std::vector<int> B2E;
+    arma::umat I2E;
+    arma::umat B2E;
 
-    std::vector<double> In;
-    std::vector<double> Bn;
+    arma::mat In;
+    arma::mat Bn;
 
-    std::vector<double> area;
+    arma::vec Il;
+    arma::vec Bl;
+
+    arma::vec area;
 };
 
 #endif // MESH2D_HPP
