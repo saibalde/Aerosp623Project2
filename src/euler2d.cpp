@@ -1,7 +1,11 @@
 #include "euler2d.hpp"
 
 #include <string>
+#include <stdexcept>
+
 #include <cmath>
+
+static const double CFL = 0.5;
 
 void Euler2d::initialize()
 {
@@ -18,8 +22,6 @@ void Euler2d::initialize()
     {
         U_.col(i) = U;
     }
-
-    U_.save("element_0.dat", arma::raw_ascii);
 }
 
 void Euler2d::setBoundaryStates()
@@ -54,16 +56,31 @@ void Euler2d::setBoundaryStates()
     {
         Uright_.col(i) = U;
     }
-
-    Ubottom_.save("bottom_0.dat", arma::raw_ascii);
-    Uright_.save("right_0.dat", arma::raw_ascii);
-    Utop_.save("top_0.dat", arma::raw_ascii);
-    Uleft_.save("left_0.dat", arma::raw_ascii);
 }
 
-void Euler2d::timestep()
+double Euler2d::timestep()
 {
+    arma::uword numElem = mesh_.nElemTot;
 
+    arma::mat R(4, numElem);
+    arma::vec S(numElem);
+    double residual = computeResidual(U_, R, S);
+
+    arma::vec deltaTOverA = 2.0 * CFL / S;
+
+    arma::mat Utemp(4, numElem);
+    for (arma::uword i = 0; i < numElem; ++i)
+    {
+        Utemp.col(i) = U_.col(i) - deltaTOverA(i) * R.col(i);
+    }
+
+    computeResidual(Utemp, R, S);
+    for (arma::uword i = 0; i < numElem; ++i)
+    {
+        U_.col(i) = 0.5 * (U_.col(i) + Utemp.col(i) - deltaTOverA(i) * R.col(i));
+    }
+
+    return residual;
 }
 
 void Euler2d::output() const
@@ -176,7 +193,7 @@ void Euler2d::computeRoeFlux(const arma::vec &UL, const arma::vec &UR,
     s = std::max(std::max(absLambda1, absLambda2), absLambda3);
 }
 
-void Euler2d::computeResidual(const arma::mat &U, arma::mat &R,
+double Euler2d::computeResidual(const arma::mat &U, arma::mat &R,
                               arma::vec &S) const
 {
     R.zeros();
@@ -196,11 +213,11 @@ void Euler2d::computeResidual(const arma::mat &U, arma::mat &R,
         double s;
         computeRoeFlux(U.col(elemL), U.col(elemR), n, F, s);
 
-        R.col(elemR) += l * F;
-        R.col(elemL) -= l * F;
+        R.col(elemL) += l * F;
+        R.col(elemR) -= l * F;
 
-        S(elemL) = std::max(S(elemL), s);
-        S(elemR) = std::max(S(elemR), s);
+        S(elemL) += l * s;
+        S(elemR) += l * s;
     }
 
     arma::uword iBFace = 0;
@@ -208,6 +225,11 @@ void Euler2d::computeResidual(const arma::mat &U, arma::mat &R,
     arma::uword nBFaceBottom = mesh_.nBFace(0);
     for (arma::uword i = 0; i < nBFaceBottom; ++i)
     {
+        if (mesh_.B2E(iBFace, 2) != 1)
+        {
+            throw std::runtime_error("Something is wrong witht the mesh");
+        }
+
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
 
         const arma::rowvec n = mesh_.Bn.row(iBFace);
@@ -218,7 +240,7 @@ void Euler2d::computeResidual(const arma::mat &U, arma::mat &R,
         computeRoeFlux(U.col(elem), Ubottom_.col(i), n, F, s);
 
         R.col(elem) += l * F;
-        S(elem) = std::max(S(elem), s);
+        S(elem) += l * s;
 
         iBFace += 1;
     }
@@ -226,6 +248,11 @@ void Euler2d::computeResidual(const arma::mat &U, arma::mat &R,
     arma::uword nBFaceRight = mesh_.nBFace(1);
     for (arma::uword i = 0; i < nBFaceRight; ++i)
     {
+        if (mesh_.B2E(iBFace, 2) != 2)
+        {
+            throw std::runtime_error("Something is wrong witht the mesh");
+        }
+
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
 
         const arma::rowvec n = mesh_.Bn.row(iBFace);
@@ -236,7 +263,7 @@ void Euler2d::computeResidual(const arma::mat &U, arma::mat &R,
         computeRoeFlux(U.col(elem), Uright_.col(i), n, F, s);
 
         R.col(elem) += l * F;
-        S(elem) = std::max(S(elem), s);
+        S(elem) += l * s;
 
         iBFace += 1;
     }
@@ -244,6 +271,11 @@ void Euler2d::computeResidual(const arma::mat &U, arma::mat &R,
     arma::uword nBFaceTop = mesh_.nBFace(2);
     for (arma::uword i = 0; i < nBFaceTop; ++i)
     {
+        if (mesh_.B2E(iBFace, 2) != 3)
+        {
+            throw std::runtime_error("Something is wrong witht the mesh");
+        }
+
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
 
         const arma::rowvec n = mesh_.Bn.row(iBFace);
@@ -254,7 +286,7 @@ void Euler2d::computeResidual(const arma::mat &U, arma::mat &R,
         computeRoeFlux(U.col(elem), Utop_.col(i), n, F, s);
 
         R.col(elem) += l * F;
-        S(elem) = std::max(S(elem), s);
+        S(elem) += l * s;
 
         iBFace += 1;
     }
@@ -262,6 +294,11 @@ void Euler2d::computeResidual(const arma::mat &U, arma::mat &R,
     arma::uword nBFaceLeft = mesh_.nBFace(3);
     for (arma::uword i = 0; i < nBFaceLeft; ++i)
     {
+        if (mesh_.B2E(iBFace, 2) != 4)
+        {
+            throw std::runtime_error("Something is wrong witht the mesh");
+        }
+
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
 
         const arma::rowvec n = mesh_.Bn.row(iBFace);
@@ -272,8 +309,15 @@ void Euler2d::computeResidual(const arma::mat &U, arma::mat &R,
         computeRoeFlux(U.col(elem), Uleft_.col(i), n, F, s);
 
         R.col(elem) += l * F;
-        S(elem) = std::max(S(elem), s);
+        S(elem) += l * s;
 
         iBFace += 1;
     }
+
+    if (iBFace != mesh_.B2E.n_rows)
+    {
+        throw std::runtime_error("Something is wrong with the mesh");
+    }
+
+    return arma::abs(R).max();
 }

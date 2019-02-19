@@ -22,14 +22,12 @@ public:
 
     void setBoundaryStates();
 
-    void timestep();
+    double timestep();
 
     void output() const;
 
     void computeRoeFlux(const arma::vec &UL, const arma::vec &UR,
                         const arma::rowvec &n, arma::vec &F, double &s) const;
-
-    void computeResidual(const arma::mat &U, arma::mat &R, arma::vec &S) const;
 
     arma::mat U_;
 
@@ -49,6 +47,9 @@ private:
     arma::mat Uright_;
     arma::mat Utop_;
     arma::mat Uleft_;
+
+    double computeResidual(const arma::mat &U, arma::mat &R,
+                           arma::vec &S) const;
 
     void computeFreeStreamState(arma::vec &U) const;
 };
