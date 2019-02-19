@@ -1,6 +1,6 @@
 add_library(conv2d
-    mesh2d.cpp
-    euler2d.cpp)
+    Mesh.cpp
+    EulerDefaultBase.cpp)
 target_include_directories(conv2d PUBLIC
     ${PROJECT_SOURCE_DIR}/include
     ${ARMADILLO_INCLUDE_DIRS})

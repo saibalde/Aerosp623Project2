@@ -4,15 +4,57 @@
 
 #include <armadillo>
 
-#include "mesh2d.hpp"
-#include "euler2d.hpp"
+#include "Conv2D/Mesh.hpp"
+#include "Conv2D/EulerDefaultBase.hpp"
+
+class Euler : public EulerDefaultBase
+{
+public:
+    Euler() : EulerDefaultBase()
+    {
+    }
+
+    ~Euler() = default;
+
+    void computeBottomFlux(const arma::vec &UInt, const arma::rowvec &n,
+                           arma::vec &F, double &s) const;
+
+    void computeRightFlux(const arma::vec &UInt, const arma::rowvec &n,
+                          arma::vec &F, double &s) const;
+
+    void computeTopFlux(const arma::vec &UInt, const arma::rowvec &n,
+                        arma::vec &F, double &s) const;
+
+    void computeLeftFlux(const arma::vec &UInt, const arma::rowvec &n,
+                         arma::vec &F, double &s) const;
+};
+
+void Euler::computeBottomFlux(const arma::vec &UInt, const arma::rowvec &n,
+                              arma::vec &F, double &s) const
+{
+}
+
+void Euler::computeRightFlux(const arma::vec &UInt, const arma::rowvec &n,
+                             arma::vec &F, double &s) const
+{
+}
+
+void Euler::computeTopFlux(const arma::vec &UInt, const arma::rowvec &n,
+                           arma::vec &F, double &s) const
+{
+}
+
+void Euler::computeLeftFlux(const arma::vec &UInt, const arma::rowvec &n,
+                            arma::vec &F, double &s) const
+{
+}
 
 double uniform(double a, double b)
 {
     return a + ((b - a) * std::rand() / RAND_MAX);
 }
 
-void consistencyTest(double gamma, const Euler2d &problem)
+void consistencyTest(double gamma, const Euler &problem)
 {
     const double rho = uniform( 0.0, 1.0);
     const double u   = uniform(-1.0, 1.0);
@@ -44,7 +86,7 @@ void consistencyTest(double gamma, const Euler2d &problem)
     std::cout << "Consistency test: L2 error = " << error << std::endl;
 }
 
-void flipTest(const Euler2d &problem)
+void flipTest(const Euler &problem)
 {
     const double rhoL = uniform( 0.0, 1.0);
     const double uL   = uniform(-1.0, 1.0);
@@ -78,7 +120,7 @@ void flipTest(const Euler2d &problem)
     std::cout << "Flip test: L2 error = " << error << std::endl;
 }
 
-void supersonicTest(double gamma, const Euler2d &problem)
+void supersonicTest(double gamma, const Euler &problem)
 {
     const double rhoL = uniform( 0.0, 1.0);
     const double uL   = 0.8;
@@ -120,13 +162,10 @@ int main()
 {
     std::srand(0);
 
-    const double gamma = 1.4;
-    const double R = 1.0;
-    const double MInf = 0.5;
-    const double pInf = 1.0;
+    double gamma = 1.4;
 
-    const Mesh2d mesh("test.gri");
-    const Euler2d problem(mesh, gamma, R, MInf, pInf);
+    Euler problem;
+    problem.setParams(gamma, 1.0, 0.5, 1.0, 0.5);
 
     consistencyTest(gamma, problem);
     flipTest(problem);

@@ -1,95 +1,11 @@
-#include "euler2d.hpp"
+#include "Conv2D/EulerDefaultBase.hpp"
 
 #include <string>
 #include <stdexcept>
 
 #include <cmath>
 
-static const double CFL = 0.5;
-
-void Euler2d::initialize()
-{
-    const arma::uword numElem = mesh_.nElemTot;
-
-    Tt_ = 1.0 + 0.5 * (gamma_ - 1.0) * MInf_ * MInf_;
-    pt_ = std::pow(Tt_, gamma_ / (gamma_ - 1.0));
-
-    arma::vec U(4);
-    computeFreeStreamState(U);
-
-    U_.set_size(4, numElem);
-    for (arma::uword i = 0; i < numElem; ++i)
-    {
-        U_.col(i) = U;
-    }
-}
-
-void Euler2d::setFreeStreamBC()
-{
-    arma::vec U(4);
-    computeFreeStreamState(U);
-
-    const arma::uword numBFaceTop = mesh_.nBFace(2);
-    Utop_.set_size(4, numBFaceTop);
-    for (arma::uword i = 0; i < numBFaceTop; ++i)
-    {
-        Utop_.col(i) = U;
-    }
-
-    const arma::uword numBFaceBottom = mesh_.nBFace(0);
-    Ubottom_.set_size(4, numBFaceBottom);
-    for (arma::uword i = 0; i < numBFaceBottom; ++i)
-    {
-        Ubottom_.col(i) = U;
-    }
-
-    const arma::uword numBFaceLeft = mesh_.nBFace(3);
-    Uleft_.set_size(4, numBFaceLeft);
-    for (arma::uword i = 0; i < numBFaceLeft; ++i)
-    {
-        Uleft_.col(i) = U;
-    }
-
-    const arma::uword numBFaceRight = mesh_.nBFace(1);
-    Uright_.set_size(4, numBFaceRight);
-    for (arma::uword i = 0; i < numBFaceRight; ++i)
-    {
-        Uright_.col(i) = U;
-    }
-}
-
-double Euler2d::timestep()
-{
-    arma::uword numElem = mesh_.nElemTot;
-
-    arma::mat R(4, numElem);
-    arma::vec S(numElem);
-    double residual = computeResidual(U_, R, S);
-
-    arma::vec deltaTOverA = 2.0 * CFL / S;
-
-    arma::mat Utemp(4, numElem);
-    for (arma::uword i = 0; i < numElem; ++i)
-    {
-        Utemp.col(i) = U_.col(i) - deltaTOverA(i) * R.col(i);
-    }
-
-    computeResidual(Utemp, R, S);
-    for (arma::uword i = 0; i < numElem; ++i)
-    {
-        U_.col(i) = 0.5 * (U_.col(i) + Utemp.col(i) - deltaTOverA(i) * R.col(i));
-    }
-
-    return residual;
-}
-
-void Euler2d::output() const
-{
-    const std::string fileName = "state_" + std::to_string(stepNum_) + ".dat";
-    U_.save(fileName, arma::raw_ascii);
-}
-
-void Euler2d::computeFreeStreamState(arma::vec &U) const
+void EulerDefaultBase::computeFreeStreamState()
 {
     const double cv = R_ / (gamma_ - 1.0);
     const double e = cv * Tt_;
@@ -100,10 +16,27 @@ void Euler2d::computeFreeStreamState(arma::vec &U) const
     const double u = q;
     const double v = 0.0;
 
-    U(0) = rho;
-    U(1) = rho * u;
-    U(2) = rho * v;
-    U(3) = rho * E;
+    Ufree_.set_size(4);
+    Ufree_(0) = rho;
+    Ufree_(1) = rho * u;
+    Ufree_(2) = rho * v;
+    Ufree_(3) = rho * E;
+}
+
+void EulerDefaultBase::initialize()
+{
+    const arma::uword numElem = mesh_.nElemTot;
+
+    Tt_ = 1.0 + 0.5 * (gamma_ - 1.0) * MInf_ * MInf_;
+    pt_ = std::pow(Tt_, gamma_ / (gamma_ - 1.0));
+
+    computeFreeStreamState();
+
+    U_.set_size(4, numElem);
+    for (arma::uword i = 0; i < numElem; ++i)
+    {
+        U_.col(i) = Ufree_;
+    }
 }
 
 double entropyFix(double epsilon, double lambda)
@@ -118,9 +51,9 @@ double entropyFix(double epsilon, double lambda)
     }
 }
 
-void Euler2d::computeRoeFlux(const arma::vec &UL, const arma::vec &UR,
-                             const arma::rowvec &n, arma::vec &F,
-                             double &s) const
+void EulerDefaultBase::computeRoeFlux(const arma::vec &UL, const arma::vec &UR,
+                                      const arma::rowvec &n, arma::vec &F,
+                                      double &s) const
 {
     // left state
     const double rhoL = UL(0);
@@ -193,8 +126,15 @@ void Euler2d::computeRoeFlux(const arma::vec &UL, const arma::vec &UR,
     s = std::max(std::max(absLambda1, absLambda2), absLambda3);
 }
 
-double Euler2d::computeResidual(const arma::mat &U, arma::mat &R,
-                              arma::vec &S) const
+void EulerDefaultBase::applyFreeStreamBC(const arma::vec &UInt,
+                                         const arma::rowvec &n,
+                                         arma::vec &F, double &s) const
+{
+    computeRoeFlux(UInt, Ufree_, n, F, s);
+}
+
+double EulerDefaultBase::computeResidual(const arma::mat &U, arma::mat &R,
+                                         arma::vec &S) const
 {
     R.zeros();
     S.zeros();
@@ -237,7 +177,7 @@ double Euler2d::computeResidual(const arma::mat &U, arma::mat &R,
 
         arma::vec F(4);
         double s;
-        computeRoeFlux(U.col(elem), Ubottom_.col(i), n, F, s);
+        computeBottomFlux(U.col(elem), n, F, s);
 
         R.col(elem) += l * F;
         S(elem) += l * s;
@@ -260,7 +200,7 @@ double Euler2d::computeResidual(const arma::mat &U, arma::mat &R,
 
         arma::vec F(4);
         double s;
-        computeRoeFlux(U.col(elem), Uright_.col(i), n, F, s);
+        computeRightFlux(U.col(elem), n, F, s);
 
         R.col(elem) += l * F;
         S(elem) += l * s;
@@ -283,7 +223,7 @@ double Euler2d::computeResidual(const arma::mat &U, arma::mat &R,
 
         arma::vec F(4);
         double s;
-        computeRoeFlux(U.col(elem), Utop_.col(i), n, F, s);
+        computeTopFlux(U.col(elem), n, F, s);
 
         R.col(elem) += l * F;
         S(elem) += l * s;
@@ -306,7 +246,7 @@ double Euler2d::computeResidual(const arma::mat &U, arma::mat &R,
 
         arma::vec F(4);
         double s;
-        computeRoeFlux(U.col(elem), Uleft_.col(i), n, F, s);
+        computeLeftFlux(U.col(elem), n, F, s);
 
         R.col(elem) += l * F;
         S(elem) += l * s;
@@ -320,4 +260,37 @@ double Euler2d::computeResidual(const arma::mat &U, arma::mat &R,
     }
 
     return arma::abs(R).max();
+}
+
+double EulerDefaultBase::timestep()
+{
+    arma::uword numElem = mesh_.nElemTot;
+
+    arma::mat R(4, numElem);
+    arma::vec S(numElem);
+    double residual = computeResidual(U_, R, S);
+
+    arma::vec dtOverA = 2.0 * CFL_ / S;
+
+    arma::mat Utemp(4, numElem);
+    for (arma::uword i = 0; i < numElem; ++i)
+    {
+        Utemp.col(i) = U_.col(i) - dtOverA(i) * R.col(i);
+    }
+
+    computeResidual(Utemp, R, S);
+    for (arma::uword i = 0; i < numElem; ++i)
+    {
+        U_.col(i) = 0.5 * (U_.col(i) + Utemp.col(i) - dtOverA(i) * R.col(i));
+    }
+
+    ++stepNum_;
+
+    return residual;
+}
+
+void EulerDefaultBase::output() const
+{
+    const std::string fileName = "state_" + std::to_string(stepNum_) + ".dat";
+    U_.save(fileName, arma::raw_ascii);
 }

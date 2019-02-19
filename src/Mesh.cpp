@@ -1,36 +1,11 @@
-#include "mesh2d.hpp"
+#include "Conv2D/Mesh.hpp"
 
 #include <iomanip>
 #include <fstream>
 #include <stdexcept>
 #include <cmath>
 
-void computeUnitDirection(double  ax, double  ay, double  bx, double  by,
-                          double  cx, double  cy, double &nx, double &ny)
-{
-    double abx = bx - ax;
-    double aby = by - ay;
-
-    double ab = std::hypot(abx, aby);
-
-    abx /= ab;
-    aby /= ab;
-
-    double acx = cx - ax;
-    double acy = cy - ay;
-
-    double dot = abx * acx + aby * acy;
-
-    acx -= dot * abx;
-    acy -= dot * aby;
-
-    double ac = std::hypot(acx, acy);
-
-    nx = acx / ac;
-    ny = acy / ac;
-}
-
-Mesh2d::Mesh2d(const std::string &inFile)
+void Mesh::readFromFile(const std::string &inFile)
 {
     std::ifstream file(inFile);
 
@@ -105,7 +80,71 @@ Mesh2d::Mesh2d(const std::string &inFile)
     }
 }
 
-void Mesh2d::setupMatrices()
+void Mesh::writeToFile(const std::string &outFile) const
+{
+    std::ofstream file(outFile);
+
+    file << nNode << " " << nElemTot << " " << dim << std::endl;
+
+    for (arma::uword iNode = 0; iNode < nNode; ++iNode)
+    {
+        file << std::scientific << std::setprecision(15)
+             << nodeCoordinates(iNode, 0) << " "
+             << std::scientific << std::setprecision(15)
+             << nodeCoordinates(iNode, 1)
+             << std::endl;
+    }
+
+    file << nBGroup << std::endl;
+
+    for (arma::uword iBGroup = 0; iBGroup < nBGroup; ++iBGroup)
+    {
+        file << nBFace(iBGroup) << " " << nf(iBGroup) << " " << title(iBGroup)
+             << std::endl;
+
+        for (arma::uword iBFace = 0; iBFace < nBFace(iBGroup); ++iBFace)
+        {
+            file << B2N(iBGroup)(iBFace, 0) << " "
+                 << B2N(iBGroup)(iBFace, 1) << std::endl;
+        }
+    }
+
+    file << nElemTot << " " << order << " " << basis << std::endl;
+
+    for (arma::uword iElem = 0; iElem < nElemTot; ++iElem)
+    {
+        file << E2N(iElem, 0) << " "
+             << E2N(iElem, 1) << " "
+             << E2N(iElem, 2) << std::endl;
+    }
+}
+
+void computeUnitDirection(double  ax, double  ay, double  bx, double  by,
+                          double  cx, double  cy, double &nx, double &ny)
+{
+    double abx = bx - ax;
+    double aby = by - ay;
+
+    double ab = std::hypot(abx, aby);
+
+    abx /= ab;
+    aby /= ab;
+
+    double acx = cx - ax;
+    double acy = cy - ay;
+
+    double dot = abx * acx + aby * acy;
+
+    acx -= dot * abx;
+    acy -= dot * aby;
+
+    double ac = std::hypot(acx, acy);
+
+    nx = acx / ac;
+    ny = acy / ac;
+}
+
+void Mesh::computeMatrices()
 {
     // total number of boundary faces
     arma::uword nBFaceTot = 0;
@@ -130,7 +169,7 @@ void Mesh2d::setupMatrices()
     arma::SpMat<arma::uword> hashElem(nNode, nNode);
     arma::SpMat<arma::uword> hashFace(nNode, nNode);
 
-    // Update I2E and In
+    // Update I2E, In and Il
     arma::uword nIFace = 0;
 
     for (arma::uword iElem = 0; iElem < nElemTot; ++iElem)
@@ -201,11 +240,12 @@ void Mesh2d::setupMatrices()
         }
     }
 
+    // clip I2E, In and Il to their appropriate sizes
     I2E.resize(nIFace, 4);
     In.resize (nIFace, 2);
     Il.resize (nIFace);
 
-    // update B2E and Bn
+    // update B2E, Bn and Bl
     arma::uword nBEdge = 0;
 
     for (arma::uword iBGroup = 0; iBGroup < nBGroup; ++iBGroup)
@@ -266,46 +306,8 @@ void Mesh2d::setupMatrices()
     }
 }
 
-void Mesh2d::output(const std::string &outFile) const
-{
-    std::ofstream file(outFile);
 
-    file << nNode << " " << nElemTot << " " << dim << std::endl;
-
-    for (arma::uword iNode = 0; iNode < nNode; ++iNode)
-    {
-        file << std::scientific << std::setprecision(15)
-             << nodeCoordinates(iNode, 0) << " "
-             << std::scientific << std::setprecision(15)
-             << nodeCoordinates(iNode, 1)
-             << std::endl;
-    }
-
-    file << nBGroup << std::endl;
-
-    for (arma::uword iBGroup = 0; iBGroup < nBGroup; ++iBGroup)
-    {
-        file << nBFace(iBGroup) << " " << nf(iBGroup) << " " << title(iBGroup)
-             << std::endl;
-
-        for (arma::uword iBFace = 0; iBFace < nBFace(iBGroup); ++iBFace)
-        {
-            file << B2N(iBGroup)(iBFace, 0) << " "
-                 << B2N(iBGroup)(iBFace, 1) << std::endl;
-        }
-    }
-
-    file << nElemTot << " " << order << " " << basis << std::endl;
-
-    for (arma::uword iElem = 0; iElem < nElemTot; ++iElem)
-    {
-        file << E2N(iElem, 0) << " "
-             << E2N(iElem, 1) << " "
-             << E2N(iElem, 2) << std::endl;
-    }
-}
-
-void Mesh2d::outputMatrices(const std::string &matFile) const
+void Mesh::writeMatricesToFile(const std::string &matFile) const
 {
     std::ofstream file(matFile);
 

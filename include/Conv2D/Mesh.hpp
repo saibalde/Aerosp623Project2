@@ -1,22 +1,19 @@
-#ifndef MESH2D_HPP
-#define MESH2D_HPP
+#ifndef MESH_HPP
+#define MESH_HPP
 
 #include <string>
 
 #include <armadillo>
 
-class Mesh2d
+struct Mesh
 {
-public:
-    Mesh2d(const std::string &inFile);
+    void readFromFile(const std::string &inFile);
 
-    ~Mesh2d() = default;
+    void writeToFile(const std::string &outFile) const;
 
-    void setupMatrices();
+    void computeMatrices();
 
-    void output(const std::string &outFile) const;
-
-    void outputMatrices(const std::string &matFile) const;
+    void writeMatricesToFile(const std::string &matFile) const;
 
     arma::uword nNode;
     arma::uword nElemTot;
@@ -47,4 +44,4 @@ public:
     arma::vec area;
 };
 
-#endif // MESH2D_HPP
+#endif // MESH_HPP
