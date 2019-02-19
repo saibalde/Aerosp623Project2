@@ -24,7 +24,7 @@ void Euler2d::initialize()
     }
 }
 
-void Euler2d::setBoundaryStates()
+void Euler2d::setFreeStreamBC()
 {
     arma::vec U(4);
     computeFreeStreamState(U);

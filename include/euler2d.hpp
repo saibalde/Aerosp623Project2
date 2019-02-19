@@ -20,7 +20,7 @@ public:
 
     void initialize();
 
-    void setBoundaryStates();
+    void setFreeStreamBC();
 
     double timestep();
 

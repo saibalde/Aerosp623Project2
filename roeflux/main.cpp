@@ -4,16 +4,15 @@
 
 #include <armadillo>
 
-#include "flux.hpp"
-
-static const double gamma_ = 1.4;
+#include "mesh2d.hpp"
+#include "euler2d.hpp"
 
 double uniform(double a, double b)
 {
     return a + ((b - a) * std::rand() / RAND_MAX);
 }
 
-void consistencyTest()
+void consistencyTest(double gamma, const Euler2d &problem)
 {
     const double rho = uniform( 0.0, 1.0);
     const double u   = uniform(-1.0, 1.0);
@@ -25,11 +24,11 @@ void consistencyTest()
     const double nl  = std::hypot(nx, ny);
 
     const double E = e + 0.5 * (u * u + v * v);
-    const double p = (gamma_ - 1.0) * rho * e;
+    const double p = (gamma - 1.0) * rho * e;
     const double H = E + p / rho;
 
     const arma::vec U {rho, rho * u, rho * v, rho * E};
-    const arma::vec n {nx / nl, ny / nl};
+    const arma::rowvec n {nx / nl, ny / nl};
     const arma::vec F {
             n[0] * (rho * u)         + n[1] * (rho * v),
             n[0] * (rho * u * u + p) + n[1] * (rho * u * v),
@@ -37,14 +36,15 @@ void consistencyTest()
             n[0] * (rho * u * H)     + n[1] * (rho * v * H)};
 
     arma::vec FHat(4);
-    roeFlux(U, U, n, FHat);
+    double s;
+    problem.computeRoeFlux(U, U, n, FHat, s);
 
     const double error = arma::norm(F - FHat);
 
     std::cout << "Consistency test: L2 error = " << error << std::endl;
 }
 
-void flipTest()
+void flipTest(const Euler2d &problem)
 {
     const double rhoL = uniform( 0.0, 1.0);
     const double uL   = uniform(-1.0, 1.0);
@@ -63,21 +63,22 @@ void flipTest()
     const arma::vec UL {rhoL, rhoL * uL, rhoL * vL, rhoL * EL};
     const arma::vec UR {rhoR, rhoR * uR, rhoR * vR, rhoR * ER};
 
-    const arma::vec nLR { nx / nl,  ny / nl};
-    const arma::vec nRL {-nx / nl, -ny / nl};
+    const arma::rowvec nLR { nx / nl,  ny / nl};
+    const arma::rowvec nRL {-nx / nl, -ny / nl};
 
     arma::vec FHatLR(4);
-    roeFlux(UL, UR, nLR, FHatLR);
-
     arma::vec FHatRL(4);
-    roeFlux(UR, UL, nRL, FHatRL);
+    double s;
+
+    problem.computeRoeFlux(UL, UR, nLR, FHatLR, s);
+    problem.computeRoeFlux(UR, UL, nRL, FHatRL, s);
 
     const double error = arma::norm(FHatLR + FHatRL);
 
     std::cout << "Flip test: L2 error = " << error << std::endl;
 }
 
-void supersonicTest()
+void supersonicTest(double gamma, const Euler2d &problem)
 {
     const double rhoL = uniform( 0.0, 1.0);
     const double uL   = 0.8;
@@ -95,12 +96,13 @@ void supersonicTest()
     const arma::vec UL {rhoL, rhoL * uL, rhoL * vL, rhoL * EL};
     const arma::vec UR {rhoR, rhoR * uR, rhoR * vR, rhoR * ER};
 
-    const arma::vec n {1.0, 0.0};
+    const arma::rowvec n {1.0, 0.0};
 
     arma::vec FHat(4);
-    roeFlux(UL, UR, n, FHat);
+    double s;
+    problem.computeRoeFlux(UL, UR, n, FHat, s);
 
-    const double pL = (gamma_ - 1.0) * rhoL * eL;
+    const double pL = (gamma - 1.0) * rhoL * eL;
     const double HL = EL + pL / rhoL;
 
     const arma::vec FL {
@@ -118,9 +120,17 @@ int main()
 {
     std::srand(0);
 
-    consistencyTest();
-    flipTest();
-    supersonicTest();
+    const double gamma = 1.4;
+    const double R = 1.0;
+    const double MInf = 0.5;
+    const double pInf = 1.0;
+
+    const Mesh2d mesh("test.gri");
+    const Euler2d problem(mesh, gamma, R, MInf, pInf);
+
+    consistencyTest(gamma, problem);
+    flipTest(problem);
+    supersonicTest(gamma, problem);
 
     return 0;
 }

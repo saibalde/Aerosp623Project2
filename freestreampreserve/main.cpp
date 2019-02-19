@@ -7,19 +7,14 @@
 #include "mesh2d.hpp"
 #include "euler2d.hpp"
 
-int main(int argc, char **argv)
+int main()
 {
-    if (argc != 2)
-    {
-        throw std::runtime_error("Need the name of the mesh");
-    }
-
-    Mesh2d mesh(argv[1]);
+    Mesh2d mesh("bump0.gri");
     mesh.setupMatrices();
 
     Euler2d problem(mesh, 1.4, 1.0, 0.5, 1.0);
     problem.initialize();
-    problem.setBoundaryStates();
+    problem.setFreeStreamBC();
 
     std::cout << "Residuals:" << std::endl;
 
