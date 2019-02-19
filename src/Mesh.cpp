@@ -1,8 +1,8 @@
 #include "Conv2D/Mesh.hpp"
 
-#include <iomanip>
 #include <fstream>
 #include <stdexcept>
+
 #include <cmath>
 
 void Mesh::readFromFile(const std::string &inFile)
@@ -86,14 +86,7 @@ void Mesh::writeToFile(const std::string &outFile) const
 
     file << nNode << " " << nElemTot << " " << dim << std::endl;
 
-    for (arma::uword iNode = 0; iNode < nNode; ++iNode)
-    {
-        file << std::scientific << std::setprecision(15)
-             << nodeCoordinates(iNode, 0) << " "
-             << std::scientific << std::setprecision(15)
-             << nodeCoordinates(iNode, 1)
-             << std::endl;
-    }
+    file << nodeCoordinates;
 
     file << nBGroup << std::endl;
 
@@ -101,22 +94,11 @@ void Mesh::writeToFile(const std::string &outFile) const
     {
         file << nBFace(iBGroup) << " " << nf(iBGroup) << " " << title(iBGroup)
              << std::endl;
-
-        for (arma::uword iBFace = 0; iBFace < nBFace(iBGroup); ++iBFace)
-        {
-            file << B2N(iBGroup)(iBFace, 0) << " "
-                 << B2N(iBGroup)(iBFace, 1) << std::endl;
-        }
+        file << B2N(iBGroup);
     }
 
     file << nElemTot << " " << order << " " << basis << std::endl;
-
-    for (arma::uword iElem = 0; iElem < nElemTot; ++iElem)
-    {
-        file << E2N(iElem, 0) << " "
-             << E2N(iElem, 1) << " "
-             << E2N(iElem, 2) << std::endl;
-    }
+    file << E2N;
 }
 
 void computeUnitDirection(double  ax, double  ay, double  bx, double  by,
@@ -157,19 +139,24 @@ void Mesh::computeMatrices()
     arma::uword nIFaceTot = static_cast<arma::uword>(std::ceil(1.5 * nElemTot));
 
     // allocate memory for mesh matrices
+    I2M.set_size (nIFaceTot, 2);
     I2E.set_size (nIFaceTot, 4);
     In.set_size  (nIFaceTot, 2);
     Il.set_size  (nIFaceTot);
+
+    B2M.set_size (nBFaceTot, 2);
     B2E.set_size (nBFaceTot, 3);
     Bn.set_size  (nBFaceTot, 2);
     Bl.set_size  (nBFaceTot);
-    area.set_size(nElemTot);
+
+    E2M.set_size (nElemTot, 2);
+    E2A.set_size (nElemTot);
 
     // hash matrices
     arma::SpMat<arma::uword> hashElem(nNode, nNode);
     arma::SpMat<arma::uword> hashFace(nNode, nNode);
 
-    // Update I2E, In and Il
+    // Update I2M, I2E, In and Il
     arma::uword nIFace = 0;
 
     for (arma::uword iElem = 0; iElem < nElemTot; ++iElem)
@@ -220,6 +207,9 @@ void Mesh::computeMatrices()
                 const double cx = nodeCoordinates(nodeNum3, 0);
                 const double cy = nodeCoordinates(nodeNum3, 1);
 
+                I2M(nIFace, 0) = 0.5 * (ax + bx);
+                I2M(nIFace, 1) = 0.5 * (ay + by);
+
                 const double l = std::hypot(ax - bx, ay - by);
                 Il(nIFace) = l;
 
@@ -240,7 +230,8 @@ void Mesh::computeMatrices()
         }
     }
 
-    // clip I2E, In and Il to their appropriate sizes
+    // clip I2M, I2E, In and Il to their appropriate sizes
+    I2M.resize(nIFace, 2);
     I2E.resize(nIFace, 4);
     In.resize (nIFace, 2);
     Il.resize (nIFace);
@@ -274,6 +265,9 @@ void Mesh::computeMatrices()
             const double cx = nodeCoordinates(nodeNum3, 0);
             const double cy = nodeCoordinates(nodeNum3, 1);
 
+            B2M(nBEdge, 0) = 0.5 * (ax + bx);
+            B2M(nBEdge, 1) = 0.5 * (ay + by);
+
             const double l = std::hypot(ax - bx, ay - by);
             Bl(nBEdge) = l;
 
@@ -301,8 +295,11 @@ void Mesh::computeMatrices()
         double cx = nodeCoordinates(nodeNum3, 0);
         double cy = nodeCoordinates(nodeNum3, 1);
 
-        area(iElem) = 0.5 * std::abs(ax * (by - cy) + bx * (cy - ay) +
-                                     cx * (ay - by));
+        E2M(iElem, 0) = (ax + bx + cx) / 3.0;
+        E2M(iElem, 1) = (ay + by + cy) / 3.0;
+
+        E2A(iElem) = 0.5 * std::abs(ax * (by - cy) + bx * (cy - ay) +
+                                    cx * (ay - by));
     }
 }
 
@@ -311,69 +308,33 @@ void Mesh::writeMatricesToFile(const std::string &matFile) const
 {
     std::ofstream file(matFile);
 
-    arma::uword nIFace = In.n_rows;
-    arma::uword nBFace = Bn.n_rows;
+    file << "I2M" << std::endl << "===" << std::endl;
+    file << I2M << std::endl;
 
     file << "I2E" << std::endl << "===" << std::endl;
+    file << I2E << std::endl;
 
-    for (arma::uword iIFace = 0; iIFace < nIFace; ++iIFace)
-    {
-        file << I2E(iIFace, 0) << " "
-             << I2E(iIFace, 1) << " "
-             << I2E(iIFace, 2) << " "
-             << I2E(iIFace, 3) << std::endl;
-    }
+    file << "In" << std::endl << "==" << std::endl;
+    file << In << std::endl;
 
-    file << std::endl << "B2E" << std::endl << "===" << std::endl;
+    file << "Il" << std::endl << "==" << std::endl;
+    file << Il << std::endl;
 
-    for (arma::uword iBFace = 0; iBFace < nBFace; ++iBFace)
-    {
-        file << B2E(iBFace, 0) << " "
-             << B2E(iBFace, 1) << " "
-             << B2E(iBFace, 2) << std::endl;
-    }
+    file << "B2E" << std::endl << "===" << std::endl;
+    file << B2E << std::endl;
 
-    file << std::endl << "In" << std::endl << "==" << std::endl;
+    file << "B2M" << std::endl << "===" << std::endl;
+    file << B2M << std::endl;
 
-    for (arma::uword iIFace = 0; iIFace < nIFace; ++iIFace)
-    {
-        file << std::scientific << std::setprecision(15)
-             << In(iIFace, 0) << " "
-             << std::scientific << std::setprecision(15)
-             << In(iIFace, 1) << std::endl;
-    }
+    file << "Bn" << std::endl << "==" << std::endl;
+    file << Bn << std::endl;
 
-    file << std::endl << "Bn" << std::endl << "==" << std::endl;
+    file << "Bl" << std::endl << "==" << std::endl;
+    file << Bl << std::endl;
 
-    for (arma::uword iBFace = 0; iBFace < nBFace; ++iBFace)
-    {
-        file << std::scientific << std::setprecision(15)
-             << Bn(iBFace, 0) << " "
-             << std::scientific << std::setprecision(15)
-             << Bn(iBFace, 1) << std::endl;
-    }
+    file << "E2A" << std::endl << "===" << std::endl;
+    file << E2A << std::endl;
 
-    file << std::endl << "Il" << std::endl << "==" << std::endl;
-
-    for (arma::uword iIFace = 0; iIFace < nIFace; ++iIFace)
-    {
-        file << std::scientific << std::setprecision(15)
-             << Il(iIFace) << std::endl;
-    }
-
-    file << std::endl << "Bl" << std::endl << "==" << std::endl;
-
-    for (arma::uword iBFace = 0; iBFace < nBFace; ++iBFace)
-    {
-        file << std::scientific << std::setprecision(15)
-             << Bl(iBFace) << std::endl;
-    }
-
-    file << std::endl << "area" << std::endl << "====" << std::endl;
-
-    for (arma::uword iElem = 0; iElem < nElemTot; ++iElem)
-    {
-        file << std::scientific << std::setprecision(15)
-             << area(iElem) << std::endl;
-    }
+    file << "E2M" << std::endl << "===" << std::endl;
+    file << E2M << std::endl;
 }

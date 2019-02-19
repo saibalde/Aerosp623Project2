@@ -5,6 +5,7 @@ find_package(Armadillo 8 REQUIRED)
 
 add_subdirectory(src)
 
+add_subdirectory(meshmat)
 add_subdirectory(roeflux)
 add_subdirectory(freestreampreserve)
 add_subdirectory(firstordersolver)

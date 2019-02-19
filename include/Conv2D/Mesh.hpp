@@ -32,16 +32,18 @@ struct Mesh
     std::string basis;
     arma::umat E2N;
 
+    arma::mat  I2M;
     arma::umat I2E;
+    arma::mat  In;
+    arma::vec  Il;
+
+    arma::mat  B2M;
     arma::umat B2E;
+    arma::mat  Bn;
+    arma::vec  Bl;
 
-    arma::mat In;
-    arma::mat Bn;
-
-    arma::vec Il;
-    arma::vec Bl;
-
-    arma::vec area;
+    arma::mat E2M;
+    arma::vec E2A;
 };
 
 #endif // MESH_HPP
