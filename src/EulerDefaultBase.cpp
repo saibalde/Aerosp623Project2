@@ -133,6 +133,120 @@ void EulerDefaultBase::applyFreeStreamBC(const arma::vec &UInt,
     computeRoeFlux(UInt, Ufree_, n, F, s);
 }
 
+void EulerDefaultBase::applyInvisidWallBC(const arma::vec &UInt,
+                                          const arma::rowvec &n,
+                                          arma::vec &F, double &s) const
+{
+    const double rho = UInt(0);
+    const double u   = UInt(1) / rho;
+    const double v   = UInt(2) / rho;
+    const double E   = UInt(3) / rho;
+
+    const double p = u * n(0) + v * n(1);
+
+    const double ub = u - p * n(0);
+    const double vb = v - p * n(0);
+
+    const double pb = (gamma_ - 1.0) * rho * (E - 0.5 * (ub * ub + vb * vb));
+
+    F(0) = 0.0;
+    F(1) = pb * n(0);
+    F(2) = pb * n(1);
+    F(3) = 0.0;
+
+    s = 0.0;
+}
+
+void EulerDefaultBase::applyInflowBC(const arma::vec &UInt,
+                                     const arma::rowvec &n,
+                                     arma::vec &F,
+                                     double &s) const
+{
+    const double rho = UInt(0);
+    const double u   = UInt(1) / rho;
+    const double v   = UInt(2) / rho;
+    const double E   = UInt(3) / rho;
+
+    const double p = (gamma_ - 1.0) * rho * (E - 0.5 * (u * u + v * v));
+    const double c = std::sqrt(gamma_ * p / rho);
+
+    const double w = u * n(0) + v * n(1);
+    const double J = w + 2.0 * c / (gamma_ - 1);
+
+    const double d = n(0);
+
+    const double A = gamma_ * R_ * Tt_ * d * d - 0.5 * (gamma_ - 1.0) * J * J;
+    const double B = 4.0 * gamma_ * R_ * Tt_ * d / (gamma_ - 1.0);
+    const double C = 4.0 * gamma_ * R_ * Tt_ / ((gamma_ - 1.0) * (gamma_ - 1.0))
+                   - J * J;
+
+    const double Delta = B * B - 4.0 * A * C;
+    if (Delta < 0)
+    {
+        throw std::runtime_error("Error in computing inflow flux");
+    }
+
+    const double Mb1 = (-B - std::sqrt(Delta)) / (2.0 * A);
+    const double Mb2 = (-B + std::sqrt(Delta)) / (2.0 * A);
+
+    const double MbMin = std::min(Mb1, Mb2);
+    const double MbMax = std::max(Mb1, Mb2);
+
+    const double Mb = MbMin < 0 ? MbMax : MbMax;
+
+    if (Mb < 0)
+    {
+        throw std::runtime_error("Mach number cannot be negative!");
+    }
+
+    const double Tb   = Tt_ / (1.0 + 0.5 * (gamma_ - 1.0) * (Mb * Mb));
+    const double pb   = pt_ * std::pow(Tb / Tt_, gamma_ / (gamma_ - 1.0));
+    const double rhob = pb / (R_ * Tb);
+    const double cb   = std::sqrt(gamma_ * pb / rhob);
+    const double ub   = Mb * cb;
+    const double vb   = 0.0;
+    const double Eb   = pb / ((gamma_ - 1.0) * rhob) + 0.5 * (ub * ub + vb * vb);
+    const double Hb   = Eb + pb / rhob;
+
+    F(0) = n(0) * (rhob * ub)           + n(1) * (rhob * vb);
+    F(1) = n(0) * (rhob * ub * ub + pb) + n(1) * (rhob * ub * vb);
+    F(2) = n(0) * (rhob * ub * vb)      + n(1) * (rhob * vb * vb + pb);
+    F(3) = n(0) * (rhob * ub * Hb)      + n(1) * (rhob * vb * Hb);
+
+    s = cb + std::abs(ub * n(0) + vb * n(1));
+}
+
+void EulerDefaultBase::applyOutflowBC(const arma::vec &UInt,
+                                      const arma::rowvec &n,
+                                      arma::vec &F, double &s) const
+{
+    const double rho = UInt(0);
+    const double u   = UInt(1) / rho;
+    const double v   = UInt(2) / rho;
+    const double E   = UInt(3) / rho;
+
+    const double p = (gamma_ - 1) * rho * (E - 0.5 * (u * u + v * v));
+    const double c = std::sqrt(gamma_ * p / rho);
+    const double w = u * n(0) + v * n(1);
+    const double J = w + 2.0 * c / (gamma_ - 1.0);
+    const double S = p / std::pow(rho, gamma_);
+
+    const double rhob = std::pow(pInf_ / S, 1.0 / gamma_);
+    const double cb   = std::sqrt(gamma_ * pInf_ / rhob);
+    const double wb   = J - 2.0 * cb / (gamma_ - 1.0);
+    const double ub   = u + (wb - w) * n(0);
+    const double vb   = v + (wb - w) * n(1);
+    const double Eb   = pInf_ / ((gamma_ - 1.0) * rhob) + 0.5 * (ub * ub + vb * vb);
+    const double Hb   = Eb + pInf_ / rhob;
+
+    F(0) = n(0) * (rhob * ub)              + n(1) * (rhob * vb);
+    F(1) = n(0) * (rhob * ub * ub + pInf_) + n(1) * (rhob * ub * vb);
+    F(2) = n(0) * (rhob * ub * vb)         + n(1) * (rhob * vb * vb + pInf_);
+    F(3) = n(0) * (rhob * ub * Hb)         + n(1) * (rhob * vb * Hb);
+
+    s = cb + std::abs(ub * n(0) + vb * n(1));
+}
+
 double EulerDefaultBase::computeResidual(const arma::mat &U, arma::mat &R,
                                          arma::vec &S) const
 {
@@ -167,7 +281,7 @@ double EulerDefaultBase::computeResidual(const arma::mat &U, arma::mat &R,
     {
         if (mesh_.B2E(iBFace, 2) != 1)
         {
-            throw std::runtime_error("Something is wrong witht the mesh");
+            throw std::runtime_error("Something is wrong with the mesh");
         }
 
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
@@ -190,7 +304,7 @@ double EulerDefaultBase::computeResidual(const arma::mat &U, arma::mat &R,
     {
         if (mesh_.B2E(iBFace, 2) != 2)
         {
-            throw std::runtime_error("Something is wrong witht the mesh");
+            throw std::runtime_error("Something is wrong with the mesh");
         }
 
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
@@ -213,7 +327,7 @@ double EulerDefaultBase::computeResidual(const arma::mat &U, arma::mat &R,
     {
         if (mesh_.B2E(iBFace, 2) != 3)
         {
-            throw std::runtime_error("Something is wrong witht the mesh");
+            throw std::runtime_error("Something is wrong with the mesh");
         }
 
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
@@ -236,7 +350,7 @@ double EulerDefaultBase::computeResidual(const arma::mat &U, arma::mat &R,
     {
         if (mesh_.B2E(iBFace, 2) != 4)
         {
-            throw std::runtime_error("Something is wrong witht the mesh");
+            throw std::runtime_error("Something is wrong with the mesh");
         }
 
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
@@ -246,6 +360,7 @@ double EulerDefaultBase::computeResidual(const arma::mat &U, arma::mat &R,
 
         arma::vec F(4);
         double s;
+
         computeLeftFlux(U.col(elem), n, F, s);
 
         R.col(elem) += l * F;

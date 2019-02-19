@@ -53,6 +53,15 @@ protected:
     void applyFreeStreamBC(const arma::vec &UInt, const arma::rowvec &n,
                            arma::vec &F, double &s) const;
 
+    void applyInvisidWallBC(const arma::vec &UInt, const arma::rowvec &n,
+                            arma::vec &F, double &s) const;
+
+    void applyInflowBC(const arma::vec &UInt, const arma::rowvec &n,
+                       arma::vec &F, double &s) const;
+
+    void applyOutflowBC(const arma::vec &UInt, const arma::rowvec &n,
+                        arma::vec &F, double &s) const;
+
 private:
     arma::uword stepNum_;
 
