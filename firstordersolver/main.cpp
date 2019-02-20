@@ -1,3 +1,4 @@
+#include <iostream>
 #include <stdexcept>
 
 #include <armadillo>
@@ -55,7 +56,7 @@ int main(int argc, char **argv)
 {
     if (argc != 2)
     {
-        throw std::runtime_error("Name of mesh file not supplied");
+        throw std::runtime_error("Name of input mesh file not supplied");
     }
 
     Mesh mesh;
@@ -75,6 +76,20 @@ int main(int argc, char **argv)
 
     const double tolerance = 1.0e-07;
     problem.firstOrderSolver(tolerance);
+
+    std::cout << "Lift coefficient = " << problem.liftCoefficient() << std::endl;
+    std::cout << "Drag coefficient = " << problem.dragCoefficient() << std::endl;
+    std::cout << "Entropy error = "    << problem.entropyError()    << std::endl;
+
+    arma::vec cp;
+    problem.pressureCoefficients(cp);
+    cp.save("pressure_coefficients.dat", arma::raw_ascii);
+
+    arma::vec M;
+    problem.machNumbers(M);
+    M.save("mach_numbers.dat", arma::raw_ascii);
+
+    problem.writeStateToFile("solution.dat");
 
     return 0;
 }

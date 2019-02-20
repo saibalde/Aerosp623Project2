@@ -49,7 +49,17 @@ public:
 
     void firstOrderSolver(double tolerance);
 
-    void output() const;
+    double liftCoefficient() const;
+
+    double dragCoefficient() const;
+
+    double entropyError() const;
+
+    void pressureCoefficients(arma::vec &cp) const;
+
+    void machNumbers(arma::vec &M) const;
+
+    void writeStateToFile(const std::string &fileName) const;
 
 protected:
     void applyFreeStreamBC(const arma::vec &UInt, const arma::rowvec &n,

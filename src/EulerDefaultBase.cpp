@@ -467,8 +467,147 @@ void EulerDefaultBase::firstOrderSolver(double tolerance)
     }
 }
 
-void EulerDefaultBase::output() const
+double EulerDefaultBase::liftCoefficient() const
 {
-    const std::string fileName = "state_" + std::to_string(stepNum_) + ".dat";
+    const double h = 0.0625;
+
+    const arma::umat  &B2E         = mesh_.B2E;
+    const arma::mat   &Bn          = mesh_.Bn;
+    const arma::vec   &Bl          = mesh_.Bl;
+    const arma::uword nBFaceBottom = mesh_.nBFace(0);
+
+    double cl = 0.0;
+
+    for (arma::uword i = 0; i < nBFaceBottom; ++i)
+    {
+        const arma::uword elem = B2E(i, 0) - 1;
+
+        const double rho = U_(0, elem);
+        const double u   = U_(1, elem) / rho;
+        const double v   = U_(2, elem) / rho;
+        const double E   = U_(3, elem) / rho;
+
+        const double p  = (gamma_ - 1.0) * rho * (E - 0.5 * (u * u + v * v));
+        const double ny = Bn(i, 1);
+        const double l  = Bl(i);
+
+        cl += (p - pInf_) * ny * l;
+    }
+
+    cl = cl / (0.5 * gamma_ * pInf_ * MInf_ * MInf_ * h);
+
+    return cl;
+}
+
+double EulerDefaultBase::dragCoefficient() const
+{
+    const double h = 0.0625;
+
+    const arma::umat  &B2E         = mesh_.B2E;
+    const arma::mat   &Bn          = mesh_.Bn;
+    const arma::vec   &Bl          = mesh_.Bl;
+    const arma::uword nBFaceBottom = mesh_.nBFace(0);
+
+    double cd = 0.0;
+
+    for (arma::uword i = 0; i < nBFaceBottom; ++i)
+    {
+        const arma::uword elem = B2E(i, 0) - 1;
+
+        const double rho = U_(0, elem);
+        const double u   = U_(1, elem) / rho;
+        const double v   = U_(2, elem) / rho;
+        const double E   = U_(3, elem) / rho;
+
+        const double p  = (gamma_ - 1.0) * rho * (E - 0.5 * (u * u + v * v));
+        const double nx = Bn(i, 0);
+        const double l  = Bl(i);
+
+        cd += (p - pInf_) * nx * l;
+    }
+
+    cd = cd / (0.5 * gamma_ * pInf_ * MInf_ * MInf_ * h);
+
+    return cd;
+}
+
+double EulerDefaultBase::entropyError() const
+{
+    const double rhot = pt_ / (R_ * Tt_);
+    const double st = pt_ / std::pow(rhot, gamma_);
+
+    const arma::vec   &E2A    = mesh_.E2A;
+    const arma::uword numElem = mesh_.nElemTot;
+
+    double Es   = 0.0;
+    double area = 0.0;
+
+    for (arma::uword i = 0; i < numElem; ++i)
+    {
+        const double rho = U_(0, i);
+        const double u   = U_(1, i) / rho;
+        const double v   = U_(2, i) / rho;
+        const double E   = U_(3, i) / rho;
+
+        const double p = (gamma_ - 1.0) * rho * (E - 0.5 * (u * u + v * v));
+        const double s = p / std::pow(rho, gamma_);
+
+        Es   += (s / st - 1.0) * (s / st - 1.0) * E2A(i);
+        area += E2A(i);
+    }
+
+    Es = Es / area;
+    Es = std::sqrt(Es);
+
+    return Es;
+}
+
+void EulerDefaultBase::pressureCoefficients(arma::vec &cp) const
+{
+    const arma::umat  &B2E         = mesh_.B2E;
+    const arma::uword nBFaceBottom = mesh_.nBFace(0);
+
+    cp.set_size(nBFaceBottom);
+
+    const double den = 0.5 * gamma_ * MInf_ * MInf_;
+
+    for (arma::uword i = 0; i < nBFaceBottom; ++i)
+    {
+        const arma::uword elem = B2E(i, 0) - 1;
+
+        const double rho = U_(0, elem);
+        const double u   = U_(1, elem) / rho;
+        const double v   = U_(2, elem) / rho;
+        const double E   = U_(3, elem) / rho;
+
+        const double p  = (gamma_ - 1.0) * rho * (E - 0.5 * (u * u + v * v));
+
+        cp(i) = (p - pInf_) / den;
+    }
+}
+
+void EulerDefaultBase::machNumbers(arma::vec &M) const
+{
+    const arma::uword numElem = mesh_.nElemTot;
+
+    M.set_size(numElem);
+
+    for (arma::uword i = 0; i < numElem; ++i)
+    {
+        const double rho = U_(0, i);
+        const double u   = U_(1, i) / rho;
+        const double v   = U_(2, i) / rho;
+        const double E   = U_(3, i) / rho;
+
+        const double q   = std::sqrt(u * u + v * v);
+        const double p = (gamma_ - 1.0) * rho * (E - 0.5 * q * q);
+        const double c = std::sqrt(gamma_ * p / rho);
+
+        M(i) = q / c;
+    }
+}
+
+void EulerDefaultBase::writeStateToFile(const std::string &fileName) const
+{
     U_.save(fileName, arma::raw_ascii);
 }
