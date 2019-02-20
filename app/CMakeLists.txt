@@ -1,0 +1,16 @@
+macro(package_add_application APPNAME)
+    add_executable(${APPNAME} ${ARGN})
+    target_link_libraries(${APPNAME} PUBLIC conv2d)
+endmacro()
+
+package_add_application(RoeFlux RoeFlux.cpp)
+package_add_application(FirstOrderPreserve FirstOrderPreserve.cpp)
+package_add_application(FirstOrderSolver FirstOrderSolver.cpp)
+package_add_application(SecondOrderPreserve SecondOrderPreserve.cpp)
+package_add_application(SecondOrderSolver SecondOrderSolver.cpp)
+
+configure_file(bump0.gri bump0.gri COPYONLY)
+configure_file(bump1.gri bump1.gri COPYONLY)
+configure_file(bump2.gri bump2.gri COPYONLY)
+configure_file(bump3.gri bump3.gri COPYONLY)
+configure_file(bump4.gri bump4.gri COPYONLY)

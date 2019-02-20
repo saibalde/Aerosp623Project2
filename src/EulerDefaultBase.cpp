@@ -1,6 +1,5 @@
 #include "Conv2D/EulerDefaultBase.hpp"
 
-#include <iostream>
 #include <iomanip>
 #include <string>
 #include <stdexcept>
@@ -38,6 +37,23 @@ void EulerDefaultBase::initialize()
     for (arma::uword i = 0; i < numElem; ++i)
     {
         U_.col(i) = Ufree_;
+    }
+}
+
+void EulerDefaultBase::initialize(const std::string fileName)
+{
+    const arma::uword numElem = mesh_.nElemTot;
+
+    Tt_ = 1.0 + 0.5 * (gamma_ - 1.0) * MInf_ * MInf_;
+    pt_ = std::pow(Tt_, gamma_ / (gamma_ - 1.0));
+
+    computeFreeStreamState();
+
+    U_.load(fileName, arma::raw_ascii);
+
+    if (U_.n_rows != 4 || U_.n_cols != numElem)
+    {
+        throw std::runtime_error("Could not set initial state from file");
     }
 }
 
@@ -130,14 +146,17 @@ void EulerDefaultBase::computeRoeFlux(const arma::vec &UL, const arma::vec &UR,
 
 void EulerDefaultBase::applyFreeStreamBC(const arma::vec &UInt,
                                          const arma::rowvec &n,
-                                         arma::vec &F, double &s) const
+                                         arma::vec &U, arma::vec &F,
+                                         double &s) const
 {
+    U = Ufree_;
     computeRoeFlux(UInt, Ufree_, n, F, s);
 }
 
 void EulerDefaultBase::applyInvisidWallBC(const arma::vec &UInt,
                                           const arma::rowvec &n,
-                                          arma::vec &F, double &s) const
+                                          arma::vec &U, arma::vec &F,
+                                          double &s) const
 {
     const double rho = UInt(0);
     const double u   = UInt(1) / rho;
@@ -147,9 +166,14 @@ void EulerDefaultBase::applyInvisidWallBC(const arma::vec &UInt,
     const double p = u * n(0) + v * n(1);
 
     const double ub = u - p * n(0);
-    const double vb = v - p * n(0);
+    const double vb = v - p * n(1);
 
     const double pb = (gamma_ - 1.0) * rho * (E - 0.5 * (ub * ub + vb * vb));
+
+    U(0) = rho;
+    U(1) = rho * ub;
+    U(2) = rho * vb;
+    U(3) = rho * E;
 
     F(0) = 0.0;
     F(1) = pb * n(0);
@@ -161,7 +185,7 @@ void EulerDefaultBase::applyInvisidWallBC(const arma::vec &UInt,
 
 void EulerDefaultBase::applyInflowBC(const arma::vec &UInt,
                                      const arma::rowvec &n,
-                                     arma::vec &F,
+                                     arma::vec &U, arma::vec &F,
                                      double &s) const
 {
     const double rho = UInt(0);
@@ -210,6 +234,11 @@ void EulerDefaultBase::applyInflowBC(const arma::vec &UInt,
     const double Eb   = pb / ((gamma_ - 1.0) * rhob) + 0.5 * (ub * ub + vb * vb);
     const double Hb   = Eb + pb / rhob;
 
+    U(0) = rhob;
+    U(1) = rhob * ub;
+    U(2) = rhob * vb;
+    U(3) = rhob * Eb;
+
     F(0) = n(0) * (rhob * ub)           + n(1) * (rhob * vb);
     F(1) = n(0) * (rhob * ub * ub + pb) + n(1) * (rhob * ub * vb);
     F(2) = n(0) * (rhob * ub * vb)      + n(1) * (rhob * vb * vb + pb);
@@ -220,7 +249,8 @@ void EulerDefaultBase::applyInflowBC(const arma::vec &UInt,
 
 void EulerDefaultBase::applyOutflowBC(const arma::vec &UInt,
                                       const arma::rowvec &n,
-                                      arma::vec &F, double &s) const
+                                      arma::vec &U, arma::vec &F,
+                                      double &s) const
 {
     const double rho = UInt(0);
     const double u   = UInt(1) / rho;
@@ -241,12 +271,49 @@ void EulerDefaultBase::applyOutflowBC(const arma::vec &UInt,
     const double Eb   = pInf_ / ((gamma_ - 1.0) * rhob) + 0.5 * (ub * ub + vb * vb);
     const double Hb   = Eb + pInf_ / rhob;
 
+    U(0) = rhob;
+    U(1) = rhob * ub;
+    U(2) = rhob * vb;
+    U(3) = rhob * Eb;
+
     F(0) = n(0) * (rhob * ub)              + n(1) * (rhob * vb);
     F(1) = n(0) * (rhob * ub * ub + pInf_) + n(1) * (rhob * ub * vb);
     F(2) = n(0) * (rhob * ub * vb)         + n(1) * (rhob * vb * vb + pInf_);
     F(3) = n(0) * (rhob * ub * Hb)         + n(1) * (rhob * vb * Hb);
 
     s = cb + std::abs(ub * n(0) + vb * n(1));
+}
+
+void EulerDefaultBase::computeBottomFlux(const arma::vec &UInt,
+                                         const arma::rowvec &n,
+                                         arma::vec &U, arma::vec &F,
+                                         double &s) const
+{
+    applyFreeStreamBC(UInt, n, U, F, s);
+}
+
+void EulerDefaultBase::computeRightFlux(const arma::vec &UInt,
+                                        const arma::rowvec &n,
+                                        arma::vec &U, arma::vec &F,
+                                        double &s) const
+{
+    applyFreeStreamBC(UInt, n, U, F, s);
+}
+
+void EulerDefaultBase::computeTopFlux(const arma::vec &UInt,
+                                      const arma::rowvec &n,
+                                      arma::vec &U, arma::vec &F,
+                                      double &s) const
+{
+    applyFreeStreamBC(UInt, n, U, F, s);
+}
+
+void EulerDefaultBase::computeLeftFlux(const arma::vec &UInt,
+                                       const arma::rowvec &n,
+                                       arma::vec &U, arma::vec &F,
+                                       double &s) const
+{
+    applyFreeStreamBC(UInt, n, U, F, s);
 }
 
 double EulerDefaultBase::computeFirstOrderResidual(const arma::mat &U,
@@ -282,21 +349,17 @@ double EulerDefaultBase::computeFirstOrderResidual(const arma::mat &U,
     arma::uword nBFaceBottom = mesh_.nBFace(0);
     for (arma::uword i = 0; i < nBFaceBottom; ++i)
     {
-        if (mesh_.B2E(iBFace, 2) != 1)
-        {
-            throw std::runtime_error("Something is wrong with the mesh");
-        }
-
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
 
         const arma::rowvec n = mesh_.Bn.row(iBFace);
         const double l = mesh_.Bl(iBFace);
 
-        arma::vec F(4);
+        arma::vec u(4);
+        arma::vec f(4);
         double s;
-        computeBottomFlux(U.col(elem), n, F, s);
+        computeBottomFlux(U.col(elem), n, u, f, s);
 
-        R.col(elem) += l * F;
+        R.col(elem) += l * f;
         S(elem) += l * s;
 
         iBFace += 1;
@@ -305,21 +368,17 @@ double EulerDefaultBase::computeFirstOrderResidual(const arma::mat &U,
     arma::uword nBFaceRight = mesh_.nBFace(1);
     for (arma::uword i = 0; i < nBFaceRight; ++i)
     {
-        if (mesh_.B2E(iBFace, 2) != 2)
-        {
-            throw std::runtime_error("Something is wrong with the mesh");
-        }
-
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
 
         const arma::rowvec n = mesh_.Bn.row(iBFace);
         const double l = mesh_.Bl(iBFace);
 
-        arma::vec F(4);
+        arma::vec u(4);
+        arma::vec f(4);
         double s;
-        computeRightFlux(U.col(elem), n, F, s);
+        computeRightFlux(U.col(elem), n, u, f, s);
 
-        R.col(elem) += l * F;
+        R.col(elem) += l * f;
         S(elem) += l * s;
 
         iBFace += 1;
@@ -328,21 +387,17 @@ double EulerDefaultBase::computeFirstOrderResidual(const arma::mat &U,
     arma::uword nBFaceTop = mesh_.nBFace(2);
     for (arma::uword i = 0; i < nBFaceTop; ++i)
     {
-        if (mesh_.B2E(iBFace, 2) != 3)
-        {
-            throw std::runtime_error("Something is wrong with the mesh");
-        }
-
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
 
         const arma::rowvec n = mesh_.Bn.row(iBFace);
         const double l = mesh_.Bl(iBFace);
 
-        arma::vec F(4);
+        arma::vec u(4);
+        arma::vec f(4);
         double s;
-        computeTopFlux(U.col(elem), n, F, s);
+        computeTopFlux(U.col(elem), n, u, f, s);
 
-        R.col(elem) += l * F;
+        R.col(elem) += l * f;
         S(elem) += l * s;
 
         iBFace += 1;
@@ -351,37 +406,31 @@ double EulerDefaultBase::computeFirstOrderResidual(const arma::mat &U,
     arma::uword nBFaceLeft = mesh_.nBFace(3);
     for (arma::uword i = 0; i < nBFaceLeft; ++i)
     {
-        if (mesh_.B2E(iBFace, 2) != 4)
-        {
-            throw std::runtime_error("Something is wrong with the mesh");
-        }
-
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
 
         const arma::rowvec n = mesh_.Bn.row(iBFace);
         const double l = mesh_.Bl(iBFace);
 
-        arma::vec F(4);
+        arma::vec u(4);
+        arma::vec f(4);
         double s;
 
-        computeLeftFlux(U.col(elem), n, F, s);
+        computeLeftFlux(U.col(elem), n, u, f, s);
 
-        R.col(elem) += l * F;
+        R.col(elem) += l * f;
         S(elem) += l * s;
 
         iBFace += 1;
     }
 
-    if (iBFace != mesh_.B2E.n_rows)
-    {
-        throw std::runtime_error("Something is wrong with the mesh");
-    }
-
     return arma::abs(R).max();
 }
 
-void EulerDefaultBase::firstOrderSolver(arma::uword numIter)
+void EulerDefaultBase::firstOrderSolver(arma::uword numIter,
+                                        const std::string &residualFile)
 {
+    std::ofstream file(residualFile);
+
     arma::uword numElem = mesh_.nElemTot;
 
     arma::mat R(4, numElem);
@@ -389,9 +438,9 @@ void EulerDefaultBase::firstOrderSolver(arma::uword numIter)
 
     // compute initial residual and output
     double residual = computeFirstOrderResidual(U_, R, S);
-    std::cout << 0 << " "
-              << std::scientific << std::setprecision(15) << residual
-              << std::endl;
+    file << 0 << " "
+         << std::scientific << std::setprecision(15) << residual
+         << std::endl;
 
     for (arma::uword i = 0; i < numIter; ++i)
     {
@@ -416,14 +465,17 @@ void EulerDefaultBase::firstOrderSolver(arma::uword numIter)
         residual = computeFirstOrderResidual(U_, R, S);
 
         // output residual
-        std::cout << i + 1 << " "
-                  << std::scientific << std::setprecision(15) << residual
-                  << std::endl;
+        file << i + 1 << " "
+             << std::scientific << std::setprecision(15) << residual
+             << std::endl;
     }
 }
 
-void EulerDefaultBase::firstOrderSolver(double tolerance)
+void EulerDefaultBase::firstOrderSolver(double tolerance,
+                                        const std::string &residualFile)
 {
+    std::ofstream file(residualFile);
+
     arma::uword numElem = mesh_.nElemTot;
 
     arma::mat R(4, numElem);
@@ -432,9 +484,9 @@ void EulerDefaultBase::firstOrderSolver(double tolerance)
     // compute initial residual and output
     arma::uword numIter = 0;
     double residual = computeFirstOrderResidual(U_, R, S);
-    std::cout << numIter << " "
-              << std::scientific << std::setprecision(15) << residual
-              << std::endl;
+    file << numIter << " "
+         << std::scientific << std::setprecision(15) << residual
+         << std::endl;
 
     while (residual > tolerance)
     {
@@ -461,9 +513,373 @@ void EulerDefaultBase::firstOrderSolver(double tolerance)
         ++numIter;
 
         // output residuals
-        std::cout << numIter << " "
-                  << std::scientific << std::setprecision(15) << residual
-                  << std::endl;
+        file << numIter << " "
+             << std::scientific << std::setprecision(15) << residual
+             << std::endl;
+    }
+}
+
+void EulerDefaultBase::computeGradients(const arma::mat &U, arma::mat &G) const
+{
+    G.zeros();
+
+    const arma::uword nIFace = mesh_.Il.n_rows;
+
+    for (arma::uword i = 0; i < nIFace; ++i)
+    {
+        const arma::uword elemL = mesh_.I2E(i, 0) - 1;
+        const arma::uword elemR = mesh_.I2E(i, 2) - 1;
+        const arma::rowvec n = mesh_.In.row(i);
+        const double l = mesh_.Il(i);
+
+        const arma::vec u = 0.5 * (U.col(elemL) + U.col(elemR));
+
+        arma::vec g(8);
+        g(arma::span(0, 3)) = l * n(0) * u;
+        g(arma::span(4, 7)) = l * n(1) * u;
+
+        G.col(elemL) += g;
+        G.col(elemR) -= g;
+    }
+
+    arma::uword iBFace = 0;
+
+    const arma::uword nBFaceBottom = mesh_.nBFace(0);
+
+    for (arma::uword i = 0; i < nBFaceBottom; ++i)
+    {
+        const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
+        const arma::rowvec n = mesh_.Bn.row(iBFace);
+        const double l = mesh_.Bl(iBFace);
+
+        arma::vec u(4);
+        arma::vec f(4);
+        double s;
+        computeBottomFlux(U.col(elem), n, u, f, s);
+
+        arma::vec g(8);
+        g(arma::span(0, 3)) = l * n(0) * u;
+        g(arma::span(4, 7)) = l * n(1) * u;
+
+        G.col(elem) += g;
+
+        iBFace += 1;
+    }
+
+    const arma::uword nBFaceRight = mesh_.nBFace(1);
+
+    for (arma::uword i = 0; i < nBFaceRight; ++i)
+    {
+        const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
+        const arma::rowvec n = mesh_.Bn.row(iBFace);
+        const double l = mesh_.Bl(iBFace);
+
+        arma::vec u(4);
+        arma::vec f(4);
+        double s;
+        computeRightFlux(U.col(elem), n, u, f, s);
+
+        arma::vec g(8);
+        g(arma::span(0, 3)) = l * n(0) * u;
+        g(arma::span(4, 7)) = l * n(1) * u;
+
+        G.col(elem) += g;
+
+        iBFace += 1;
+    }
+
+    const arma::uword nBFaceTop = mesh_.nBFace(2);
+
+    for (arma::uword i = 0; i < nBFaceTop; ++i)
+    {
+        const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
+        const arma::rowvec n = mesh_.Bn.row(iBFace);
+        const double l = mesh_.Bl(iBFace);
+
+        arma::vec u(4);
+        arma::vec f(4);
+        double s;
+        computeTopFlux(U.col(elem), n, u, f, s);
+
+        arma::vec g(8);
+        g(arma::span(0, 3)) = l * n(0) * u;
+        g(arma::span(4, 7)) = l * n(1) * u;
+
+        G.col(elem) += g;
+
+        iBFace += 1;
+    }
+
+    const arma::uword nBFaceLeft = mesh_.nBFace(3);
+
+    for (arma::uword i = 0; i < nBFaceLeft; ++i)
+    {
+        const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
+        const arma::rowvec n = mesh_.Bn.row(iBFace);
+        const double l = mesh_.Bl(iBFace);
+
+        arma::vec u(4);
+        arma::vec f(4);
+        double s;
+        computeLeftFlux(U.col(elem), n, u, f, s);
+
+        arma::vec g(8);
+        g(arma::span(0, 3)) = l * n(0) * u;
+        g(arma::span(4, 7)) = l * n(1) * u;
+
+        G.col(elem) += g;
+
+        iBFace += 1;
+    }
+
+    const arma::uword nElem = mesh_.nElemTot;
+
+    for (arma::uword i = 0; i < nElem; ++i)
+    {
+        G.col(i) /= mesh_.E2A(i);
+    }
+}
+
+double EulerDefaultBase::computeSecondOrderResidual(const arma::mat &U,
+                                                    const arma::mat &G,
+                                                    arma::mat &R,
+                                                    arma::vec &S) const
+{
+    R.zeros();
+    S.zeros();
+
+    arma::uword numIFace = mesh_.I2E.n_rows;
+
+    for (arma::uword i = 0; i < numIFace; ++i)
+    {
+        const arma::uword elemL = mesh_.I2E(i, 0) - 1;
+        const arma::uword elemR = mesh_.I2E(i, 2) - 1;
+        const arma::rowvec n = mesh_.In.row(i);
+        const double l = mesh_.Il(i);
+
+        const double xL = mesh_.I2M(i, 0) - mesh_.E2M(elemL, 0);
+        const double yL = mesh_.I2M(i, 1) - mesh_.E2M(elemL, 1);
+        const arma::vec gL = G.col(elemL);
+        const arma::vec uL = U.col(elemL) + xL * gL(arma::span(0, 3))
+                                          + yL * gL(arma::span(4, 7));
+
+        const double xR = mesh_.I2M(i, 0) - mesh_.E2M(elemR, 0);
+        const double yR = mesh_.I2M(i, 1) - mesh_.E2M(elemR, 1);
+        const arma::vec gR = G.col(elemR);
+        const arma::vec uR = U.col(elemR) + xR * gR(arma::span(0, 3))
+                                          + yR * gR(arma::span(4, 7));
+
+        arma::vec F(4);
+        double s;
+        computeRoeFlux(uL, uR, n, F, s);
+
+        R.col(elemL) += l * F;
+        R.col(elemR) -= l * F;
+
+        S(elemL) += l * s;
+        S(elemR) += l * s;
+    }
+
+    arma::uword iBFace = 0;
+
+    arma::uword nBFaceBottom = mesh_.nBFace(0);
+    for (arma::uword i = 0; i < nBFaceBottom; ++i)
+    {
+        const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
+        const arma::rowvec n = mesh_.Bn.row(iBFace);
+        const double l = mesh_.Bl(iBFace);
+
+        const double x = mesh_.B2M(iBFace, 0) - mesh_.E2M(elem, 0);
+        const double y = mesh_.B2M(iBFace, 1) - mesh_.E2M(elem, 1);
+        const arma::vec g = G.col(elem);
+        const arma::vec uInt = U.col(elem) + x * g(arma::span(0, 3))
+                                           + y * g(arma::span(4, 7));
+
+        arma::vec u(4);
+        arma::vec f(4);
+        double s;
+        computeBottomFlux(uInt, n, u, f, s);
+
+        R.col(elem) += l * f;
+        S(elem) += l * s;
+
+        iBFace += 1;
+    }
+
+    arma::uword nBFaceRight = mesh_.nBFace(1);
+    for (arma::uword i = 0; i < nBFaceRight; ++i)
+    {
+        const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
+        const arma::rowvec n = mesh_.Bn.row(iBFace);
+        const double l = mesh_.Bl(iBFace);
+
+        const double x = mesh_.B2M(iBFace, 0) - mesh_.E2M(elem, 0);
+        const double y = mesh_.B2M(iBFace, 1) - mesh_.E2M(elem, 1);
+        const arma::vec g = G.col(elem);
+        const arma::vec uInt = U.col(elem) + x * g(arma::span(0, 3))
+                                           + y * g(arma::span(4, 7));
+
+        arma::vec u(4);
+        arma::vec f(4);
+        double s;
+        computeRightFlux(uInt, n, u, f, s);
+
+        R.col(elem) += l * f;
+        S(elem) += l * s;
+
+        iBFace += 1;
+    }
+
+    arma::uword nBFaceTop = mesh_.nBFace(2);
+    for (arma::uword i = 0; i < nBFaceTop; ++i)
+    {
+        const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
+        const arma::rowvec n = mesh_.Bn.row(iBFace);
+        const double l = mesh_.Bl(iBFace);
+
+        const double x = mesh_.B2M(iBFace, 0) - mesh_.E2M(elem, 0);
+        const double y = mesh_.B2M(iBFace, 1) - mesh_.E2M(elem, 1);
+        const arma::vec g = G.col(elem);
+        const arma::vec uInt = U.col(elem) + x * g(arma::span(0, 3))
+                                           + y * g(arma::span(4, 7));
+
+        arma::vec u(4);
+        arma::vec f(4);
+        double s;
+        computeTopFlux(uInt, n, u, f, s);
+
+        R.col(elem) += l * f;
+        S(elem) += l * s;
+
+        iBFace += 1;
+    }
+
+    arma::uword nBFaceLeft = mesh_.nBFace(3);
+    for (arma::uword i = 0; i < nBFaceLeft; ++i)
+    {
+        const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
+        const arma::rowvec n = mesh_.Bn.row(iBFace);
+        const double l = mesh_.Bl(iBFace);
+
+        const double x = mesh_.B2M(iBFace, 0) - mesh_.E2M(elem, 0);
+        const double y = mesh_.B2M(iBFace, 1) - mesh_.E2M(elem, 1);
+        const arma::vec g = G.col(elem);
+        const arma::vec uInt = U.col(elem) + x * g(arma::span(0, 3))
+                                           + y * g(arma::span(4, 7));
+
+        arma::vec u(4);
+        arma::vec f(4);
+        double s;
+
+        computeLeftFlux(uInt, n, u, f, s);
+
+        R.col(elem) += l * f;
+        S(elem) += l * s;
+
+        iBFace += 1;
+    }
+
+    return arma::abs(R).max();
+}
+
+void EulerDefaultBase::secondOrderSolver(arma::uword numIter,
+                                         const std::string &residualFile)
+{
+    std::ofstream file(residualFile);
+
+    arma::uword numElem = mesh_.nElemTot;
+
+    arma::mat G(8, numElem);
+    arma::mat R(4, numElem);
+    arma::vec S(numElem);
+
+    // compute initial residual and output
+    computeGradients(U_, G);
+    double residual = computeSecondOrderResidual(U_, G, R, S);
+    file << 0 << " "
+         << std::scientific << std::setprecision(15) << residual
+         << std::endl;
+
+    for (arma::uword i = 0; i < numIter; ++i)
+    {
+        // esitmate timesteps
+        arma::vec dtOverA = 2.0 * CFL_ / S;
+
+        // RK2 step 1
+        arma::mat Utemp(4, numElem);
+        for (arma::uword i = 0; i < numElem; ++i)
+        {
+            Utemp.col(i) = U_.col(i) - dtOverA(i) * R.col(i);
+        }
+
+        // RK2 step 2
+        computeGradients(Utemp, G);
+        computeSecondOrderResidual(Utemp, G, R, S);
+        for (arma::uword i = 0; i < numElem; ++i)
+        {
+            U_.col(i) = 0.5 * (U_.col(i) + Utemp.col(i) - dtOverA(i) * R.col(i));
+        }
+
+        // prepare residuals for next timestep
+        computeGradients(U_, G);
+        residual = computeSecondOrderResidual(U_, G, R, S);
+
+        // output residual
+        file << i + 1 << " "
+             << std::scientific << std::setprecision(15) << residual
+             << std::endl;
+    }
+}
+
+void EulerDefaultBase::secondOrderSolver(double tolerance,
+                                         const std::string &residualFile)
+{
+    std::ofstream file(residualFile);
+
+    arma::uword numElem = mesh_.nElemTot;
+
+    arma::mat G(8, numElem);
+    arma::mat R(4, numElem);
+    arma::vec S(numElem);
+
+    // compute initial residual and output
+    arma::uword numIter = 0;
+    computeGradients(U_, G);
+    double residual = computeSecondOrderResidual(U_, G, R, S);
+    file << numIter << " "
+         << std::scientific << std::setprecision(15) << residual
+         << std::endl;
+
+    while (residual > tolerance)
+    {
+        // esitmate timesteps
+        arma::vec dtOverA = 2.0 * CFL_ / S;
+
+        // RK2 step 1
+        arma::mat Utemp(4, numElem);
+        for (arma::uword i = 0; i < numElem; ++i)
+        {
+            Utemp.col(i) = U_.col(i) - dtOverA(i) * R.col(i);
+        }
+
+        // RK2 step 2
+        computeGradients(Utemp, G);
+        computeSecondOrderResidual(Utemp, G, R, S);
+        for (arma::uword i = 0; i < numElem; ++i)
+        {
+            U_.col(i) = 0.5 * (U_.col(i) + Utemp.col(i) - dtOverA(i) * R.col(i));
+        }
+
+        // prepare residual for next timestep
+        computeGradients(U_, G);
+        residual = computeSecondOrderResidual(U_, G, R, S);
+
+        ++numIter;
+
+        // output residuals
+        file << numIter << " "
+             << std::scientific << std::setprecision(15) << residual
+             << std::endl;
     }
 }
 

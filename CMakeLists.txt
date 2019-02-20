@@ -4,8 +4,5 @@ project(Conv2D LANGUAGES CXX)
 find_package(Armadillo 8 REQUIRED)
 
 add_subdirectory(src)
-
-add_subdirectory(meshmat)
-add_subdirectory(roeflux)
-add_subdirectory(freestreampreserve)
-add_subdirectory(firstordersolver)
+add_subdirectory(test)
+add_subdirectory(app)

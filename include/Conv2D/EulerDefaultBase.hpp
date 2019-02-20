@@ -1,6 +1,8 @@
 #ifndef EULERDEFUALTBASE_HPP
 #define EULERDEFAULTBASE_HPP
 
+#include <string>
+
 #include <armadillo>
 
 #include "Conv2D/Mesh.hpp"
@@ -30,24 +32,34 @@ public:
 
     void initialize();
 
+    void initialize(const std::string fileName);
+
     void computeRoeFlux(const arma::vec &UL, const arma::vec &UR,
                         const arma::rowvec &n, arma::vec &F, double &s) const;
 
     virtual void computeBottomFlux(const arma::vec &UInt, const arma::rowvec &n,
-                                   arma::vec &F, double &s) const = 0;
+                                   arma::vec &U, arma::vec &F,
+                                   double &s) const;
 
     virtual void computeRightFlux(const arma::vec &UInt,  const arma::rowvec &n,
-                                  arma::vec &F, double &s) const = 0;
+                                  arma::vec &U, arma::vec &F,
+                                  double &s) const;
 
     virtual void computeTopFlux(const arma::vec &UInt, const arma::rowvec &n,
-                                arma::vec &F, double &s) const = 0;
+                                arma::vec &U, arma::vec &F,
+                                double &s) const;
 
     virtual void computeLeftFlux(const arma::vec &UInt, const arma::rowvec &n,
-                                 arma::vec &F, double &s) const = 0;
+                                 arma::vec &U, arma::vec &F,
+                                 double &s) const;
 
-    void firstOrderSolver(arma::uword numIter);
+    void firstOrderSolver(arma::uword numIter, const std::string &residualFile);
 
-    void firstOrderSolver(double tolerance);
+    void firstOrderSolver(double tolerance, const std::string &residualFile);
+
+    void secondOrderSolver(arma::uword numIter, const std::string &residualFile);
+
+    void secondOrderSolver(double tolerance, const std::string &residualFile);
 
     double liftCoefficient() const;
 
@@ -63,16 +75,16 @@ public:
 
 protected:
     void applyFreeStreamBC(const arma::vec &UInt, const arma::rowvec &n,
-                           arma::vec &F, double &s) const;
+                           arma::vec &U, arma::vec &F, double &s) const;
 
     void applyInvisidWallBC(const arma::vec &UInt, const arma::rowvec &n,
-                            arma::vec &F, double &s) const;
+                            arma::vec &U, arma::vec &F, double &s) const;
 
     void applyInflowBC(const arma::vec &UInt, const arma::rowvec &n,
-                       arma::vec &F, double &s) const;
+                       arma::vec &U, arma::vec &F, double &s) const;
 
     void applyOutflowBC(const arma::vec &UInt, const arma::rowvec &n,
-                        arma::vec &F, double &s) const;
+                        arma::vec &U, arma::vec &F, double &s) const;
 
 private:
     arma::uword stepNum_;
@@ -95,6 +107,11 @@ private:
 
     double computeFirstOrderResidual(const arma::mat &U, arma::mat &R,
                                      arma::vec &S) const;
+
+    void computeGradients(const arma::mat &U, arma::mat &G) const;
+
+    double computeSecondOrderResidual(const arma::mat &U, const arma::mat &G,
+                                      arma::mat &R, arma::vec &S) const;
 };
 
 #endif // EULERDEFAULTBASE_HPP
