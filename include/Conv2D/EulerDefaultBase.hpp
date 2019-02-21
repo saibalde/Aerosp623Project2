@@ -21,18 +21,34 @@ public:
         mesh_ = mesh;
     }
 
-    void setParams(double gamma, double R, double MInf, double pInf, double CFL)
+    void setSpecificHeatRatio(double gamma)
     {
         gamma_ = gamma;
+    }
+
+    void setGasConstant(double R)
+    {
         R_ = R;
+    }
+
+    void setFreeFlowMachNumber(double MInf)
+    {
         MInf_ = MInf;
+    }
+
+    void setFreeFlowStaticPressure(double pInf)
+    {
         pInf_ = pInf;
+    }
+
+    void setCFLNumber(double CFL)
+    {
         CFL_ = CFL;
     }
 
-    void initialize();
+    void setInitialState();
 
-    void initialize(const std::string fileName);
+    void setInitialState(const std::string fileName);
 
     void computeRoeFlux(const arma::vec &UL, const arma::vec &UR,
                         const arma::rowvec &n, arma::vec &F, double &s) const;

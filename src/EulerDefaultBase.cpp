@@ -24,7 +24,7 @@ void EulerDefaultBase::computeFreeStreamState()
     Ufree_(3) = rho * E;
 }
 
-void EulerDefaultBase::initialize()
+void EulerDefaultBase::setInitialState()
 {
     const arma::uword numElem = mesh_.nElemTot;
 
@@ -40,7 +40,7 @@ void EulerDefaultBase::initialize()
     }
 }
 
-void EulerDefaultBase::initialize(const std::string fileName)
+void EulerDefaultBase::setInitialState(const std::string fileName)
 {
     const arma::uword numElem = mesh_.nElemTot;
 

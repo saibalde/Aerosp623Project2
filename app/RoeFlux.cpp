@@ -123,7 +123,7 @@ int main()
     double gamma = 1.4;
 
     EulerDefaultBase problem;
-    problem.setParams(gamma, 1.0, 0.5, 1.0, 0.5);
+    problem.setSpecificHeatRatio(gamma);
 
     consistencyTest(gamma, problem);
     flipTest(problem);

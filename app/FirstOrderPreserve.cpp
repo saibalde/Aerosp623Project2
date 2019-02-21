@@ -31,16 +31,15 @@ int main(int argc, char **argv)
     mesh.readFromFile(meshFile);
     mesh.computeMatrices();
 
-    const double gamma = 1.4;
-    const double R = 1.0;
-    const double MInf = 0.5;
-    const double pInf = 1.0;
-    const double CFL = 0.5;
-
     EulerDefaultBase problem;
     problem.setMesh(mesh);
-    problem.setParams(gamma, R, MInf, pInf, CFL);
-    problem.initialize();
+    problem.setGasConstant(1.0);
+    problem.setSpecificHeatRatio(1.4);
+    problem.setFreeFlowMachNumber(0.5);
+    problem.setFreeFlowStaticPressure(1.0);
+    problem.setCFLNumber(0.5);
+
+    problem.setInitialState();
 
     const arma::uword numIter = 1000;
     problem.runFirstOrderSolver(numIter, residualFile);
