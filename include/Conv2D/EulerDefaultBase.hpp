@@ -67,7 +67,7 @@ public:
 
     double entropyError() const;
 
-    void pressureCoefficients(arma::vec &cp) const;
+    void writePressureCoefficientsToFile(const std::string &fileName) const;
 
     void writeMachNumbersToFile(const std::string &fileName) const;
 

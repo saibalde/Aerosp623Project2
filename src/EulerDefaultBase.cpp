@@ -978,12 +978,13 @@ double EulerDefaultBase::entropyError() const
     return Es;
 }
 
-void EulerDefaultBase::pressureCoefficients(arma::vec &cp) const
+void EulerDefaultBase::writePressureCoefficientsToFile(
+        const std::string &fileName) const
 {
     const arma::umat  &B2E         = mesh_.B2E;
     const arma::uword nBFaceBottom = mesh_.nBFace(0);
 
-    cp.set_size(nBFaceBottom);
+    arma::mat cp(nBFaceBottom, 2);
 
     const double den = 0.5 * gamma_ * MInf_ * MInf_;
 
@@ -998,8 +999,11 @@ void EulerDefaultBase::pressureCoefficients(arma::vec &cp) const
 
         const double p  = (gamma_ - 1.0) * rho * (E - 0.5 * (u * u + v * v));
 
-        cp(i) = (p - pInf_) / den;
+        cp(i, 0) = mesh_.B2M(i, 0);
+        cp(i, 1) = (p - pInf_) / den;
     }
+
+    cp.save(fileName, arma::raw_ascii);
 }
 
 void EulerDefaultBase::writeMachNumbersToFile(const std::string &fileName) const

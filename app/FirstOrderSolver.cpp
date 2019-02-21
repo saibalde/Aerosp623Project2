@@ -108,10 +108,7 @@ int main(int argc, char **argv)
          << std::scientific << std::setprecision(15)
          << problem.entropyError()    << std::endl;
 
-    arma::vec cp;
-    problem.pressureCoefficients(cp);
-    cp.save(pressureFile, arma::raw_ascii);
-
+    problem.writePressureCoefficientsToFile(pressureFile);
     problem.writeMachNumbersToFile(machFile);
 
     problem.writeStateToFile(solutionFile);
