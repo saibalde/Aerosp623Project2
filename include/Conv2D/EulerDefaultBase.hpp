@@ -69,7 +69,7 @@ public:
 
     void pressureCoefficients(arma::vec &cp) const;
 
-    void machNumbers(arma::vec &M) const;
+    void writeMachNumbersToFile(const std::string &fileName) const;
 
     void writeStateToFile(const std::string &fileName) const;
 

@@ -1002,11 +1002,12 @@ void EulerDefaultBase::pressureCoefficients(arma::vec &cp) const
     }
 }
 
-void EulerDefaultBase::machNumbers(arma::vec &M) const
+void EulerDefaultBase::writeMachNumbersToFile(const std::string &fileName) const
 {
+    const arma::uword numNode = mesh_.nNode;
     const arma::uword numElem = mesh_.nElemTot;
 
-    M.set_size(numElem);
+    arma::vec M(numElem);
 
     for (arma::uword i = 0; i < numElem; ++i)
     {
@@ -1020,6 +1021,51 @@ void EulerDefaultBase::machNumbers(arma::vec &M) const
         const double c = std::sqrt(gamma_ * p / rho);
 
         M(i) = q / c;
+    }
+
+    std::ofstream file(fileName);
+
+    file << "# vtk DataFile Version3.0" << std::endl;
+    file << "Mach numbers" << std::endl;
+    file << "ASCII" << std::endl;
+    file << std::endl;
+
+    file << "DATASET UNSTRUCTURED_GRID" << std::endl;
+    file << "POINTS " << numNode << " double" << std::endl;
+    for (arma::uword i = 0; i < numNode; ++i)
+    {
+        file << std::scientific << std::setprecision(15)
+             << mesh_.nodeCoordinates(i, 0) << " "
+             << std::scientific << std::setprecision(15)
+             << mesh_.nodeCoordinates(i, 1) << " "
+             << std::scientific << std::setprecision(15)
+             << 0.0 << std::endl;;
+    }
+    file << std::endl;
+
+    file << "CELLS " << numElem << " " << 4 * numElem << std::endl;
+    for (arma::uword i = 0; i < numElem; ++i)
+    {
+        file << 3 << " "
+             << mesh_.E2N(i, 0) - 1 << " "
+             << mesh_.E2N(i, 1) - 1 << " "
+             << mesh_.E2N(i, 2) - 1 << std::endl;
+    }
+    file << std::endl;
+
+    file << "CELL_TYPES " << numElem << std::endl;
+    for (arma::uword i = 0; i < numElem; ++i)
+    {
+        file << 5 << std::endl;
+    }
+    file << std::endl;
+
+    file << "CELL_DATA " << numElem << std::endl;
+    file << "SCALARS mach_number double " << 1 << std::endl;
+    file << "LOOKUP_TABLE default" << std::endl;
+    for (arma::uword i = 0; i < numElem; ++i)
+    {
+        file << M(i) << std::endl;
     }
 }
 

@@ -76,7 +76,7 @@ int main(int argc, char **argv)
     const std::string residualFile   = "FirstOrderSolverResidual" + choiceString + ".dat";
     const std::string validationFile = "FirstOrderSolverValidation" + choiceString + ".dat";
     const std::string pressureFile   = "FirstOrderSolverPressureCoefficients" + choiceString + ".dat";
-    const std::string machFile       = "FirstOrderSolverMachNumbers" + choiceString + ".dat";
+    const std::string machFile       = "FirstOrderSolverMachNumbers" + choiceString + ".vtk";
     const std::string solutionFile   = "FirstOrderSolverSolution" + choiceString + ".dat";
 
     Mesh mesh;
@@ -112,9 +112,7 @@ int main(int argc, char **argv)
     problem.pressureCoefficients(cp);
     cp.save(pressureFile, arma::raw_ascii);
 
-    arma::vec M;
-    problem.machNumbers(M);
-    M.save(machFile, arma::raw_ascii);
+    problem.writeMachNumbersToFile(machFile);
 
     problem.writeStateToFile(solutionFile);
 
