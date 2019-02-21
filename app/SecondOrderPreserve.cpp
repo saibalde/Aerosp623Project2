@@ -1,3 +1,8 @@
+#include <string>
+#include <stdexcept>
+
+#include <iostream>
+
 #include <armadillo>
 
 #include "Conv2D/Mesh.hpp"
@@ -38,7 +43,7 @@ int main(int argc, char **argv)
     problem.initialize();
 
     const arma::uword numIter = 1000;
-    problem.secondOrderSolver(numIter, residualFile);
+    problem.runSecondOrderSolver(numIter, residualFile);
 
     return 0;
 }

@@ -53,19 +53,19 @@ public:
                                  arma::vec &U, arma::vec &F,
                                  double &s) const;
 
-    void firstOrderSolver(arma::uword numIter, const std::string &residualFile);
+    void runFirstOrderSolver(arma::uword numIter,
+                             const std::string &residualFile);
 
-    void firstOrderSolver(double tolerance, const std::string &residualFile);
+    void runFirstOrderSolver(double tolerance,
+                             const std::string &residualFile);
 
-    void secondOrderSolver(arma::uword numIter, const std::string &residualFile);
+    void runSecondOrderSolver(arma::uword numIter,
+                              const std::string &residualFile);
 
-    void secondOrderSolver(double tolerance, const std::string &residualFile);
+    void runSecondOrderSolver(double tolerance,
+                              const std::string &residualFile);
 
-    double liftCoefficient() const;
-
-    double dragCoefficient() const;
-
-    double entropyError() const;
+    void writeValidationValuesTofile(const std::string &fileName) const;
 
     void writePressureCoefficientsToFile(const std::string &fileName) const;
 
@@ -112,6 +112,12 @@ private:
 
     double computeSecondOrderResidual(const arma::mat &U, const arma::mat &G,
                                       arma::mat &R, arma::vec &S) const;
+
+    double liftCoefficient() const;
+
+    double dragCoefficient() const;
+
+    double entropyError() const;
 };
 
 #endif // EULERDEFAULTBASE_HPP

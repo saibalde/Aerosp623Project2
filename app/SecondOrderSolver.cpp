@@ -1,6 +1,7 @@
-#include <fstream>
-#include <iomanip>
+#include <string>
 #include <stdexcept>
+
+#include <cstdlib>
 
 #include <armadillo>
 
@@ -94,19 +95,9 @@ int main(int argc, char **argv)
     problem.initialize(initialFile);
 
     const double tolerance = 1.0e-07;
-    problem.secondOrderSolver(tolerance, residualFile);
+    problem.runSecondOrderSolver(tolerance, residualFile);
 
-    std::ofstream file(validationFile);
-    file << "Lift coefficient = "
-         << std::scientific << std::setprecision(15)
-         << problem.liftCoefficient() << std::endl;
-    file << "Drag coefficient = "
-         << std::scientific << std::setprecision(15)
-         << problem.dragCoefficient() << std::endl;
-    file << "Entropy error = "
-         << std::scientific << std::setprecision(15)
-         << problem.entropyError() << std::endl;
-
+    problem.writeValidationValuesTofile(validationFile);
     problem.writePressureCoefficientsToFile(pressureFile);
     problem.writeMachNumbersToFile(machFile);
 

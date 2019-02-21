@@ -426,8 +426,8 @@ double EulerDefaultBase::computeFirstOrderResidual(const arma::mat &U,
     return arma::abs(R).max();
 }
 
-void EulerDefaultBase::firstOrderSolver(arma::uword numIter,
-                                        const std::string &residualFile)
+void EulerDefaultBase::runFirstOrderSolver(arma::uword numIter,
+                                           const std::string &residualFile)
 {
     std::ofstream file(residualFile);
 
@@ -471,8 +471,8 @@ void EulerDefaultBase::firstOrderSolver(arma::uword numIter,
     }
 }
 
-void EulerDefaultBase::firstOrderSolver(double tolerance,
-                                        const std::string &residualFile)
+void EulerDefaultBase::runFirstOrderSolver(double tolerance,
+                                           const std::string &residualFile)
 {
     std::ofstream file(residualFile);
 
@@ -782,8 +782,8 @@ double EulerDefaultBase::computeSecondOrderResidual(const arma::mat &U,
     return arma::abs(R).max();
 }
 
-void EulerDefaultBase::secondOrderSolver(arma::uword numIter,
-                                         const std::string &residualFile)
+void EulerDefaultBase::runSecondOrderSolver(arma::uword numIter,
+                                            const std::string &residualFile)
 {
     std::ofstream file(residualFile);
 
@@ -831,8 +831,8 @@ void EulerDefaultBase::secondOrderSolver(arma::uword numIter,
     }
 }
 
-void EulerDefaultBase::secondOrderSolver(double tolerance,
-                                         const std::string &residualFile)
+void EulerDefaultBase::runSecondOrderSolver(double tolerance,
+                                            const std::string &residualFile)
 {
     std::ofstream file(residualFile);
 
@@ -976,6 +976,22 @@ double EulerDefaultBase::entropyError() const
     Es = std::sqrt(Es);
 
     return Es;
+}
+
+void EulerDefaultBase::writeValidationValuesTofile(
+        const std::string &fileName) const
+{
+    std::ofstream file(fileName);
+
+    file << "Lift coefficient = "
+         << std::scientific << std::setprecision(15)
+         << liftCoefficient() << std::endl;
+    file << "Drag coefficient = "
+         << std::scientific << std::setprecision(15)
+         << dragCoefficient() << std::endl;
+    file << "Entropy error = "
+         << std::scientific << std::setprecision(15)
+         << entropyError()    << std::endl;
 }
 
 void EulerDefaultBase::writePressureCoefficientsToFile(
