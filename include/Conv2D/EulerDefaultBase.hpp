@@ -29,6 +29,7 @@ public:
     void setMesh(const Mesh &mesh)
     {
         mesh_ = mesh;
+        parseBoundaryGroups();
     }
 
     /**
@@ -381,9 +382,59 @@ private:
     arma::mat U_;
 
     /**
+     * @brief Which boundary group is at the bottom
+     */
+    arma::uword bottomBGroup_;
+
+    /**
+     * @brief How many rows to go through B2E, Bn etc. to reach bottom boundary group
+     */
+    arma::uword bottomBGroupOffset_;
+
+    /**
+     * @brief Which boundary group is at the right
+     */
+    arma::uword rightBGroup_;
+
+    /**
+     * @brief How many rows to go through B2E, Bn etc. to reach right boundary group
+     */
+    arma::uword rightBGroupOffset_;
+
+    /**
+     * @brief Which boundary group is at the top
+     */
+    arma::uword topBGroup_;
+
+    /**
+     * @brief How many rows to go through B2E, Bn etc. to reach top boundary group
+     */
+    arma::uword topBGroupOffset_;
+
+    /**
+     * @brief Which boundary group is at the left
+     */
+    arma::uword leftBGroup_;
+
+    /**
+     * @brief How many rows to go through B2E, Bn etc. to reach left boundary group
+     */
+    arma::uword leftBGroupOffset_;
+
+    /**
      * @brief Compute the free stream state
      */
     void computeFreeStreamState();
+
+    /**
+     * @brief Parse boundary groups and figure out which boundary is where
+     *
+     * In particular, set up a correspondance between boundary location and
+     * boundary group numbers, e.g. if the boundary groups are specified in
+     * the order: bottom, top, left, right, then this routine sets up
+     * bottomBGroup = 0, topBGroup = 1, leftBGroup = 2 and rightBGroup = 3
+     */
+    void parseBoundaryGroups();
 
     /**
      * @brief Compute first order residual

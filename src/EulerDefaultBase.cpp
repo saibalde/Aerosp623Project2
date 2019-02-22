@@ -1,10 +1,78 @@
 #include "Conv2D/EulerDefaultBase.hpp"
 
+#include <fstream>
 #include <iomanip>
 #include <string>
 #include <stdexcept>
 
 #include <cmath>
+
+void EulerDefaultBase::parseBoundaryGroups()
+{
+    if (mesh_.nBGroup != 4)
+    {
+        throw std::runtime_error("We only support meshes with four boundary groups");
+    }
+
+    bottomBGroup_ = 4;
+    rightBGroup_  = 4;
+    topBGroup_    = 4;
+    leftBGroup_   = 4;
+
+    for (arma::uword i = 0; i < 4; ++i)
+    {
+        if (mesh_.title(i).compare("Bottom") == 0)
+        {
+            bottomBGroup_ = i;
+        }
+        else if (mesh_.title(i).compare("Right") == 0)
+        {
+            rightBGroup_ = i;
+        }
+        else if (mesh_.title(i).compare("Top") == 0)
+        {
+            topBGroup_ = i;
+        }
+        else if (mesh_.title(i).compare("Left") == 0)
+        {
+            leftBGroup_ = i;
+        }
+        else
+        {
+            throw std::runtime_error("Could not parse boundary group type");
+        }
+    }
+
+    if (bottomBGroup_ == 4 || rightBGroup_ == 4 || topBGroup_ == 4 ||
+        leftBGroup_ == 4)
+    {
+        throw std::runtime_error("Error in parsing boundary groups");
+    }
+
+    bottomBGroupOffset_ = 0;
+    for (arma::uword  i = 0; i < bottomBGroup_; ++i)
+    {
+        bottomBGroupOffset_ += mesh_.nBFace(i);
+    }
+
+    rightBGroupOffset_ = 0;
+    for (arma::uword i = 0; i < rightBGroup_; ++i)
+    {
+        rightBGroupOffset_ += mesh_.nBFace(i);
+    }
+
+    topBGroupOffset_ = 0;
+    for (arma::uword i = 0; i < topBGroup_; ++i)
+    {
+        topBGroupOffset_ += mesh_.nBFace(i);
+    }
+
+    leftBGroupOffset_ = 0;
+    for (arma::uword i = 0; i < leftBGroup_; ++i)
+    {
+        leftBGroupOffset_ += mesh_.nBFace(i);
+    }
+}
 
 void EulerDefaultBase::computeFreeStreamState()
 {
@@ -344,11 +412,10 @@ double EulerDefaultBase::computeFirstOrderResidual(const arma::mat &U,
         S(elemR) += l * s;
     }
 
-    arma::uword iBFace = 0;
-
-    arma::uword nBFaceBottom = mesh_.nBFace(0);
+    arma::uword nBFaceBottom = mesh_.nBFace(bottomBGroup_);
     for (arma::uword i = 0; i < nBFaceBottom; ++i)
     {
+        const arma::uword iBFace = bottomBGroupOffset_ + i;
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
 
         const arma::rowvec n = mesh_.Bn.row(iBFace);
@@ -361,13 +428,12 @@ double EulerDefaultBase::computeFirstOrderResidual(const arma::mat &U,
 
         R.col(elem) += l * f;
         S(elem) += l * s;
-
-        iBFace += 1;
     }
 
-    arma::uword nBFaceRight = mesh_.nBFace(1);
+    arma::uword nBFaceRight = mesh_.nBFace(rightBGroup_);
     for (arma::uword i = 0; i < nBFaceRight; ++i)
     {
+        const arma::uword iBFace = rightBGroupOffset_ + i;
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
 
         const arma::rowvec n = mesh_.Bn.row(iBFace);
@@ -380,13 +446,12 @@ double EulerDefaultBase::computeFirstOrderResidual(const arma::mat &U,
 
         R.col(elem) += l * f;
         S(elem) += l * s;
-
-        iBFace += 1;
     }
 
-    arma::uword nBFaceTop = mesh_.nBFace(2);
+    arma::uword nBFaceTop = mesh_.nBFace(topBGroup_);
     for (arma::uword i = 0; i < nBFaceTop; ++i)
     {
+        const arma::uword iBFace = topBGroupOffset_ + i;
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
 
         const arma::rowvec n = mesh_.Bn.row(iBFace);
@@ -399,13 +464,12 @@ double EulerDefaultBase::computeFirstOrderResidual(const arma::mat &U,
 
         R.col(elem) += l * f;
         S(elem) += l * s;
-
-        iBFace += 1;
     }
 
-    arma::uword nBFaceLeft = mesh_.nBFace(3);
+    arma::uword nBFaceLeft = mesh_.nBFace(leftBGroup_);
     for (arma::uword i = 0; i < nBFaceLeft; ++i)
     {
+        const arma::uword iBFace = leftBGroupOffset_ + i;
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
 
         const arma::rowvec n = mesh_.Bn.row(iBFace);
@@ -419,8 +483,6 @@ double EulerDefaultBase::computeFirstOrderResidual(const arma::mat &U,
 
         R.col(elem) += l * f;
         S(elem) += l * s;
-
-        iBFace += 1;
     }
 
     return arma::abs(R).max();
@@ -542,12 +604,11 @@ void EulerDefaultBase::computeGradients(const arma::mat &U, arma::mat &G) const
         G.col(elemR) -= g;
     }
 
-    arma::uword iBFace = 0;
-
-    const arma::uword nBFaceBottom = mesh_.nBFace(0);
+    const arma::uword nBFaceBottom = mesh_.nBFace(bottomBGroup_);
 
     for (arma::uword i = 0; i < nBFaceBottom; ++i)
     {
+        const arma::uword iBFace = bottomBGroupOffset_ + i;
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
         const arma::rowvec n = mesh_.Bn.row(iBFace);
         const double l = mesh_.Bl(iBFace);
@@ -562,14 +623,13 @@ void EulerDefaultBase::computeGradients(const arma::mat &U, arma::mat &G) const
         g(arma::span(4, 7)) = l * n(1) * u;
 
         G.col(elem) += g;
-
-        iBFace += 1;
     }
 
-    const arma::uword nBFaceRight = mesh_.nBFace(1);
+    const arma::uword nBFaceRight = mesh_.nBFace(rightBGroup_);
 
     for (arma::uword i = 0; i < nBFaceRight; ++i)
     {
+        const arma::uword iBFace = rightBGroupOffset_ + i;
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
         const arma::rowvec n = mesh_.Bn.row(iBFace);
         const double l = mesh_.Bl(iBFace);
@@ -584,14 +644,13 @@ void EulerDefaultBase::computeGradients(const arma::mat &U, arma::mat &G) const
         g(arma::span(4, 7)) = l * n(1) * u;
 
         G.col(elem) += g;
-
-        iBFace += 1;
     }
 
-    const arma::uword nBFaceTop = mesh_.nBFace(2);
+    const arma::uword nBFaceTop = mesh_.nBFace(topBGroup_);
 
     for (arma::uword i = 0; i < nBFaceTop; ++i)
     {
+        const arma::uword iBFace = topBGroupOffset_ + i;
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
         const arma::rowvec n = mesh_.Bn.row(iBFace);
         const double l = mesh_.Bl(iBFace);
@@ -606,14 +665,13 @@ void EulerDefaultBase::computeGradients(const arma::mat &U, arma::mat &G) const
         g(arma::span(4, 7)) = l * n(1) * u;
 
         G.col(elem) += g;
-
-        iBFace += 1;
     }
 
-    const arma::uword nBFaceLeft = mesh_.nBFace(3);
+    const arma::uword nBFaceLeft = mesh_.nBFace(leftBGroup_);
 
     for (arma::uword i = 0; i < nBFaceLeft; ++i)
     {
+        const arma::uword iBFace = leftBGroupOffset_ + i;
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
         const arma::rowvec n = mesh_.Bn.row(iBFace);
         const double l = mesh_.Bl(iBFace);
@@ -628,8 +686,6 @@ void EulerDefaultBase::computeGradients(const arma::mat &U, arma::mat &G) const
         g(arma::span(4, 7)) = l * n(1) * u;
 
         G.col(elem) += g;
-
-        iBFace += 1;
     }
 
     const arma::uword nElem = mesh_.nElemTot;
@@ -680,11 +736,10 @@ double EulerDefaultBase::computeSecondOrderResidual(const arma::mat &U,
         S(elemR) += l * s;
     }
 
-    arma::uword iBFace = 0;
-
-    arma::uword nBFaceBottom = mesh_.nBFace(0);
+    arma::uword nBFaceBottom = mesh_.nBFace(bottomBGroup_);
     for (arma::uword i = 0; i < nBFaceBottom; ++i)
     {
+        const arma::uword iBFace = bottomBGroupOffset_ + i;
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
         const arma::rowvec n = mesh_.Bn.row(iBFace);
         const double l = mesh_.Bl(iBFace);
@@ -702,13 +757,12 @@ double EulerDefaultBase::computeSecondOrderResidual(const arma::mat &U,
 
         R.col(elem) += l * f;
         S(elem) += l * s;
-
-        iBFace += 1;
     }
 
-    arma::uword nBFaceRight = mesh_.nBFace(1);
+    arma::uword nBFaceRight = mesh_.nBFace(rightBGroup_);
     for (arma::uword i = 0; i < nBFaceRight; ++i)
     {
+        const arma::uword iBFace = rightBGroupOffset_ + i;
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
         const arma::rowvec n = mesh_.Bn.row(iBFace);
         const double l = mesh_.Bl(iBFace);
@@ -726,13 +780,12 @@ double EulerDefaultBase::computeSecondOrderResidual(const arma::mat &U,
 
         R.col(elem) += l * f;
         S(elem) += l * s;
-
-        iBFace += 1;
     }
 
-    arma::uword nBFaceTop = mesh_.nBFace(2);
+    arma::uword nBFaceTop = mesh_.nBFace(topBGroup_);
     for (arma::uword i = 0; i < nBFaceTop; ++i)
     {
+        const arma::uword iBFace = topBGroupOffset_ + i;
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
         const arma::rowvec n = mesh_.Bn.row(iBFace);
         const double l = mesh_.Bl(iBFace);
@@ -750,13 +803,12 @@ double EulerDefaultBase::computeSecondOrderResidual(const arma::mat &U,
 
         R.col(elem) += l * f;
         S(elem) += l * s;
-
-        iBFace += 1;
     }
 
-    arma::uword nBFaceLeft = mesh_.nBFace(3);
+    arma::uword nBFaceLeft = mesh_.nBFace(leftBGroup_);
     for (arma::uword i = 0; i < nBFaceLeft; ++i)
     {
+        const arma::uword iBFace = leftBGroupOffset_ + i;
         const arma::uword elem = mesh_.B2E(iBFace, 0) - 1;
         const arma::rowvec n = mesh_.Bn.row(iBFace);
         const double l = mesh_.Bl(iBFace);
@@ -775,8 +827,6 @@ double EulerDefaultBase::computeSecondOrderResidual(const arma::mat &U,
 
         R.col(elem) += l * f;
         S(elem) += l * s;
-
-        iBFace += 1;
     }
 
     return arma::abs(R).max();
@@ -890,13 +940,14 @@ double EulerDefaultBase::liftCoefficient() const
     const arma::umat  &B2E         = mesh_.B2E;
     const arma::mat   &Bn          = mesh_.Bn;
     const arma::vec   &Bl          = mesh_.Bl;
-    const arma::uword nBFaceBottom = mesh_.nBFace(0);
+    const arma::uword nBFaceBottom = mesh_.nBFace(bottomBGroup_);
 
     double cl = 0.0;
 
     for (arma::uword i = 0; i < nBFaceBottom; ++i)
     {
-        const arma::uword elem = B2E(i, 0) - 1;
+        const arma::uword iBFace = bottomBGroupOffset_ + i;
+        const arma::uword elem = B2E(iBFace, 0) - 1;
 
         const double rho = U_(0, elem);
         const double u   = U_(1, elem) / rho;
@@ -904,8 +955,8 @@ double EulerDefaultBase::liftCoefficient() const
         const double E   = U_(3, elem) / rho;
 
         const double p  = (gamma_ - 1.0) * rho * (E - 0.5 * (u * u + v * v));
-        const double ny = Bn(i, 1);
-        const double l  = Bl(i);
+        const double ny = Bn(iBFace, 1);
+        const double l  = Bl(iBFace);
 
         cl += (p - pInf_) * ny * l;
     }
@@ -922,13 +973,14 @@ double EulerDefaultBase::dragCoefficient() const
     const arma::umat  &B2E         = mesh_.B2E;
     const arma::mat   &Bn          = mesh_.Bn;
     const arma::vec   &Bl          = mesh_.Bl;
-    const arma::uword nBFaceBottom = mesh_.nBFace(0);
+    const arma::uword nBFaceBottom = mesh_.nBFace(bottomBGroup_);
 
     double cd = 0.0;
 
     for (arma::uword i = 0; i < nBFaceBottom; ++i)
     {
-        const arma::uword elem = B2E(i, 0) - 1;
+        const arma::uword iBFace = bottomBGroupOffset_ + i;
+        const arma::uword elem = B2E(iBFace, 0) - 1;
 
         const double rho = U_(0, elem);
         const double u   = U_(1, elem) / rho;
@@ -936,8 +988,8 @@ double EulerDefaultBase::dragCoefficient() const
         const double E   = U_(3, elem) / rho;
 
         const double p  = (gamma_ - 1.0) * rho * (E - 0.5 * (u * u + v * v));
-        const double nx = Bn(i, 0);
-        const double l  = Bl(i);
+        const double nx = Bn(iBFace, 0);
+        const double l  = Bl(iBFace);
 
         cd += (p - pInf_) * nx * l;
     }
@@ -998,7 +1050,7 @@ void EulerDefaultBase::writePressureCoefficientsToFile(
         const std::string &fileName) const
 {
     const arma::umat  &B2E         = mesh_.B2E;
-    const arma::uword nBFaceBottom = mesh_.nBFace(0);
+    const arma::uword nBFaceBottom = mesh_.nBFace(bottomBGroup_);
 
     arma::mat cp(nBFaceBottom, 2);
 
@@ -1006,7 +1058,8 @@ void EulerDefaultBase::writePressureCoefficientsToFile(
 
     for (arma::uword i = 0; i < nBFaceBottom; ++i)
     {
-        const arma::uword elem = B2E(i, 0) - 1;
+        const arma::uword iBFace = bottomBGroupOffset_ + i;
+        const arma::uword elem = B2E(iBFace, 0) - 1;
 
         const double rho = U_(0, elem);
         const double u   = U_(1, elem) / rho;
@@ -1015,7 +1068,7 @@ void EulerDefaultBase::writePressureCoefficientsToFile(
 
         const double p  = (gamma_ - 1.0) * rho * (E - 0.5 * (u * u + v * v));
 
-        cp(i, 0) = mesh_.B2M(i, 0);
+        cp(i, 0) = mesh_.B2M(iBFace, 0);
         cp(i, 1) = (p - pInf_) / den;
     }
 
